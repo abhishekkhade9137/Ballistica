@@ -1,0 +1,145 @@
+.analysisContainer {
+  background-color: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.analysisContainer h2 {
+  color: #667eea;
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+  border-bottom: 2px solid #667eea;
+  padding-bottom: 10px;
+}
+
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.metricCard {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 15px;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.metricCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+}
+
+.metricCard h3 {
+  margin: 0 0 8px 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.value {
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin: 8px 0;
+  font-family: 'Courier New', monospace;
+}
+
+.label {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  margin: 0;
+}
+
+.summary {
+  background-color: #f8f9fa;
+  border-left: 4px solid #667eea;
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.summary h3 {
+  color: #667eea;
+  margin-top: 0;
+}
+
+.summary ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.summary li {
+  padding: 8px 0;
+  color: #333;
+  line-height: 1.6;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.summary li:last-child {
+  border-bottom: none;
+}
+
+.summary strong {
+  color: #667eea;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .metricsGrid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+  }
+
+  .metricCard {
+    padding: 12px;
+  }
+
+  .value {
+    font-size: 1.4rem;
+  }
+
+  .analysisContainer {
+    padding: 15px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .analysisContainer {
+    background-color: #1f2028;
+    border-color: #2e303a;
+  }
+
+  .metricCard {
+    box-shadow: 0 2px 8px rgba(192, 132, 252, 0.2);
+  }
+
+  .metricCard:hover {
+    box-shadow: 0 4px 12px rgba(192, 132, 252, 0.4);
+  }
+
+  .summary {
+    background-color: #2e303a;
+    border-left-color: #c084fc;
+  }
+
+  .summary h3 {
+    color: #c084fc;
+  }
+
+  .summary strong {
+    color: #c084fc;
+  }
+
+  .summary li {
+    color: #9ca3af;
+    border-bottom-color: #2e303a;
+  }
+}
