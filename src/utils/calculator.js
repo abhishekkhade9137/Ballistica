@@ -108,6 +108,7 @@ export function calculateTrajectory(params) {
     startElevation = 0,  // metres ASL at launch
     targetElevation = 0, // metres ASL at target surface
     dt = 0.01,           // integration time-step (seconds) — keep small for Euler stability
+    _fastMode = false,   // internal flag for fast iterative solvers
   } = params;
 
   // ── Input validation ──────────────────────────────────────────────────────
@@ -195,7 +196,9 @@ export function calculateTrajectory(params) {
 
     const currentAbsAlt = startElevation + z;
     const { lat, lng } = xyToLatLng(x, y, startLat, startLng);
-    trajectory.push({ lat, lng, x, y, z, altitude: currentAbsAlt });
+    if (!_fastMode) {
+      trajectory.push({ lat, lng, x, y, z, altitude: currentAbsAlt });
+    }
 
     // Track apex after minimum steps
     if (stepCount >= MIN_FLIGHT_STEPS && !peaked && vz < 0) {
@@ -214,12 +217,22 @@ export function calculateTrajectory(params) {
   }
 
   // ── Guard: always need at least 2 points ─────────────────────────────────
-  if (trajectory.length < 2) {
+  if (!_fastMode && trajectory.length < 2) {
     trajectory.push({ ...trajectory[0], z: -0.1, altitude: startElevation - 0.1 });
   }
 
+  const impactPoint = _fastMode 
+    ? { lat: xyToLatLng(x,y,startLat,startLng).lat, lng: xyToLatLng(x,y,startLat,startLng).lng, x, y, z, t, altitude: startElevation + z }
+    : trajectory[trajectory.length - 1];
+
+  if (_fastMode) {
+    return { 
+      impactPoint, 
+      analysis: { groundDistance: haversineDistance({lat: startLat, lng: startLng}, impactPoint).toFixed(2) } 
+    };
+  }
+
   const impactIndex = trajectory.length - 1;
-  const impactPoint = trajectory[impactIndex];
 
   // ── Analysis metrics ─────────────────────────────────────────────────────
   const timeOfFlight = t;
@@ -316,4 +329,120 @@ export function calculateLandingPoint(params) {
 
 export function convertUnits(value, fromUnit, toUnit) {
   return value;
+}
+
+// Calculate geographic bearing from one lat/lng to another
+export function calculateBearing(lat1, lng1, lat2, lng2) {
+  const phi1 = lat1 * DEG_TO_RAD;
+  const phi2 = lat2 * DEG_TO_RAD;
+  const dLambda = (lng2 - lng1) * DEG_TO_RAD;
+  const y = Math.sin(dLambda) * Math.cos(phi2);
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(dLambda);
+  const brng = Math.atan2(y, x) * RAD_TO_DEG;
+  return (brng + 360) % 360;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// calculateTargetingSolution  — Inverse Kinematics solver
+// ─────────────────────────────────────────────────────────────────────────────
+export function calculateTargetingSolution(params, targetLatLng, solveFor = 'elevationLow') {
+  const startPos = { lat: params.startLat, lng: params.startLng };
+  const targetRange = haversineDistance(startPos, targetLatLng);
+  const baseAzimuth = calculateBearing(startPos.lat, startPos.lng, targetLatLng.lat, targetLatLng.lng);
+  
+  // Create a copy of params with fastMode enabled for iterative solver
+  const baseParams = { ...params, _fastMode: true };
+
+  // Helper: Bisection search for Elevation Angle given fixed Azimuth
+  const solveElevation = (azimuth, minAngle, maxAngle, isHighAngle) => {
+    let low = minAngle, high = maxAngle;
+    let lastError = Infinity;
+    let bestAngle = -1;
+    for (let i = 0; i < 20; i++) {
+      let mid = (low + high) / 2;
+      const res = calculateTrajectory({ ...baseParams, elevationAngle: mid, azimuthAngle: azimuth });
+      const r = parseFloat(res.analysis.groundDistance);
+      const rError = r - targetRange;
+      
+      if (Math.abs(rError) < Math.abs(lastError)) { 
+        lastError = rError; 
+        bestAngle = mid; 
+      }
+      
+      if (isHighAngle) {
+          // For high angle (>45), aiming higher decreases range.
+          if (r < targetRange) high = mid; else low = mid;
+      } else {
+          // For low angle (<45), aiming higher increases range.
+          if (r < targetRange) low = mid; else high = mid;
+      }
+    }
+    return { angle: bestAngle, rangeError: lastError };
+  };
+
+  // Helper: Bisection search for Velocity given fixed Elevation Angle
+  const solveVelocity = (azimuth, fixedAngle) => {
+    let low = 0, high = 4000;
+    let lastError = Infinity;
+    let bestV = -1;
+    for (let i = 0; i < 25; i++) {
+      let mid = (low + high) / 2;
+      const res = calculateTrajectory({ ...baseParams, velocity: mid, elevationAngle: fixedAngle, azimuthAngle: azimuth });
+      const r = parseFloat(res.analysis.groundDistance);
+      const rError = r - targetRange;
+      
+      if (Math.abs(rError) < Math.abs(lastError)) { 
+        lastError = rError; 
+        bestV = mid; 
+      }
+      if (r < targetRange) low = mid; else high = mid;
+    }
+    return { velocity: bestV, rangeError: lastError };
+  };
+
+  // Run the solver iteratively to correct for Coriolis & Wind cross-range drift
+  let currentAzimuth = baseAzimuth;
+  let finalPrimaryVar = -1;
+  let finalError = Infinity;
+
+  const isHighAngle = solveFor === 'elevationHigh';
+  const solveForVel = solveFor === 'velocity';
+
+  for (let iter = 0; iter < 4; iter++) {
+    let opt;
+    if (solveForVel) {
+      opt = solveVelocity(currentAzimuth, params.elevationAngle);
+      finalPrimaryVar = opt.velocity;
+    } else {
+      opt = solveElevation(currentAzimuth, isHighAngle ? 45 : 0, isHighAngle ? 90 : 45, isHighAngle);
+      finalPrimaryVar = opt.angle;
+    }
+    
+    finalError = opt.rangeError;
+
+    // Simulate one more time to check azimuth drift
+    const testParams = solveForVel 
+      ? { ...baseParams, velocity: finalPrimaryVar, elevationAngle: params.elevationAngle, azimuthAngle: currentAzimuth }
+      : { ...baseParams, elevationAngle: finalPrimaryVar, azimuthAngle: currentAzimuth };
+      
+    const sim = calculateTrajectory(testParams);
+    const simBearing = calculateBearing(startPos.lat, startPos.lng, sim.impactPoint.lat, sim.impactPoint.lng);
+    
+    let angularError = targetRange === 0 ? 0 : (baseAzimuth - simBearing);
+    if (angularError > 180) angularError -= 360;
+    if (angularError < -180) angularError += 360;
+    
+    currentAzimuth = (currentAzimuth + angularError + 360) % 360;
+    if (Math.abs(angularError) < 0.001) break;
+  }
+
+  // Return the configured parameters to the UI
+  return {
+    ...params,
+    azimuthAngle: parseFloat(currentAzimuth.toFixed(4)),
+    elevationAngle: solveForVel ? params.elevationAngle : parseFloat(finalPrimaryVar.toFixed(4)),
+    velocity: solveForVel ? parseFloat(finalPrimaryVar.toFixed(2)) : params.velocity,
+    targetRange: parseFloat(targetRange.toFixed(2)),
+    rangeError: parseFloat(finalError.toFixed(2))
+  };
 }

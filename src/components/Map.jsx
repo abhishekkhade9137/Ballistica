@@ -15,15 +15,18 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-function Map({ trajectoryData, onSetStartingPoint, startingPoint }) {
+function Map({ trajectoryData, onSetStartingPoint, onSetTargetPoint, startingPoint, targetPoint }) {
   const containerRef  = useRef(null); // the DOM <div>
   const mapRef        = useRef(null); // Leaflet map instance
   const layersRef     = useRef([]);   // trajectory / impact layers
   const startMarkerRef = useRef(null);
+  const targetMarkerRef = useRef(null);
 
   // Stable ref so the click handler never needs to be re-bound
   const onSetStartingPointRef = useRef(onSetStartingPoint);
+  const onSetTargetPointRef = useRef(onSetTargetPoint);
   useEffect(() => { onSetStartingPointRef.current = onSetStartingPoint; }, [onSetStartingPoint]);
+  useEffect(() => { onSetTargetPointRef.current = onSetTargetPoint; }, [onSetTargetPoint]);
 
   // ── Initialise map once ──────────────────────────────────────────────────
   useEffect(() => {
@@ -44,6 +47,13 @@ function Map({ trajectoryData, onSetStartingPoint, startingPoint }) {
       const { lat, lng } = e.latlng;
       if (onSetStartingPointRef.current) {
         onSetStartingPointRef.current(lat, lng);
+      }
+    });
+
+    map.on('contextmenu', (e) => { // Right click
+      const { lat, lng } = e.latlng;
+      if (onSetTargetPointRef.current) {
+        onSetTargetPointRef.current(lat, lng);
       }
     });
 
@@ -119,10 +129,34 @@ function Map({ trajectoryData, onSetStartingPoint, startingPoint }) {
     if (startingPoint && (startingPoint.lat !== 0 || startingPoint.lng !== 0)) {
       const marker = L.marker([startingPoint.lat, startingPoint.lng])
         .addTo(map)
-        .bindPopup('<b>Selected Start</b><br>Click Calculate to fire from here.');
+        .bindPopup('<b>Selected Start</b><br>Right-click map to set target.');
       startMarkerRef.current = marker;
     }
   }, [startingPoint]);
+
+  // ── Update "target point" preview marker ─────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (targetMarkerRef.current) {
+      map.removeLayer(targetMarkerRef.current);
+      targetMarkerRef.current = null;
+    }
+
+    if (targetPoint && (targetPoint.lat !== 0 || targetPoint.lng !== 0)) {
+      const circle = L.circleMarker([targetPoint.lat, targetPoint.lng], {
+        radius: 8,
+        color: '#e53e3e',
+        fillColor: '#fc8181',
+        fillOpacity: 0.8,
+        weight: 2
+      })
+      .addTo(map)
+      .bindPopup('<b>Explicit Target</b><br>Will be used for inverse calculation.');
+      targetMarkerRef.current = circle;
+    }
+  }, [targetPoint]);
 
   return (
     <div

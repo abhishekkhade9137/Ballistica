@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import styles from './InputBar.module.css';
 import { fetchElevation } from '../utils/calculator';
 
-function InputBar({ onCalculate, startingPoint, onUpdateStartingPoint }) {
+function InputBar({ onCalculate, startingPoint, targetPoint, onUpdateStartingPoint, onUpdateTargetPoint }) {
+  const [mode, setMode] = useState('forward'); // 'forward' | 'targeting'
+  const [solveFor, setSolveFor] = useState('elevationLow'); // 'elevationLow' | 'elevationHigh' | 'velocity'
+  
   const [elevationAngle, setElevationAngle] = useState('45');
   const [azimuthAngle, setAzimuthAngle] = useState('0');
   const [velocity, setVelocity] = useState('300');
@@ -10,6 +13,8 @@ function InputBar({ onCalculate, startingPoint, onUpdateStartingPoint }) {
   const [windDirection, setWindDirection] = useState('0');
   const [startLat, setStartLat] = useState('');
   const [startLng, setStartLng] = useState('');
+  const [targetLat, setTargetLat] = useState('');
+  const [targetLng, setTargetLng] = useState('');
   const [startElevation, setStartElevation] = useState('0');
   const [targetElevation, setTargetElevation] = useState('0');
   const [gravity, setGravity] = useState('9.81');
@@ -51,6 +56,13 @@ function InputBar({ onCalculate, startingPoint, onUpdateStartingPoint }) {
     setStartLng(startingPoint.lng.toString());
   }, [startingPoint]);
 
+  useEffect(() => {
+    if (targetPoint) {
+      setTargetLat(targetPoint.lat.toString());
+      setTargetLng(targetPoint.lng.toString());
+    }
+  }, [targetPoint]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const params = {
@@ -66,12 +78,31 @@ function InputBar({ onCalculate, startingPoint, onUpdateStartingPoint }) {
       gravity: parseFloat(gravity),
       dragCoeff: parseFloat(dragCoeff),
       mass: parseFloat(mass),
+      mode,
+      solveFor,
+      targetLatLng: mode === 'targeting' ? { lat: parseFloat(targetLat) || 0, lng: parseFloat(targetLng) || 0 } : null,
     };
 
-    // Validate required parameters
-    if (isNaN(params.elevationAngle) || isNaN(params.velocity) || isNaN(params.mass)) {
-      alert('Please enter valid numerical values');
-      return;
+    // Validate required parameters based on mode
+    if (mode === 'forward') {
+      if (isNaN(params.elevationAngle) || isNaN(params.velocity) || isNaN(params.mass)) {
+        alert('Please enter valid numerical values');
+        return;
+      }
+    } else {
+      // Targeting Mode Validation
+      if (isNaN(params.mass) || isNaN(params.targetLatLng.lat) || isNaN(params.targetLatLng.lng)) {
+        alert('Please enter valid numerical values for Mass and Target Coordinates');
+        return;
+      }
+      if (solveFor === 'velocity' && isNaN(params.elevationAngle)) {
+        alert('You must provide a fixed Elevation Angle to solve for Velocity');
+        return;
+      }
+      if (solveFor.startsWith('elevation') && isNaN(params.velocity)) {
+        alert('You must provide a fixed Velocity to solve for Elevation');
+        return;
+      }
     }
 
     if (onCalculate) {
@@ -82,17 +113,25 @@ function InputBar({ onCalculate, startingPoint, onUpdateStartingPoint }) {
   const handleLatChange = (e) => {
     const value = e.target.value;
     setStartLat(value);
-    if (onUpdateStartingPoint) {
-      onUpdateStartingPoint(parseFloat(value) || 0, parseFloat(startLng) || 0);
-    }
+    if (onUpdateStartingPoint) onUpdateStartingPoint(parseFloat(value) || 0, parseFloat(startLng) || 0);
   };
 
   const handleLngChange = (e) => {
     const value = e.target.value;
     setStartLng(value);
-    if (onUpdateStartingPoint) {
-      onUpdateStartingPoint(parseFloat(startLat) || 0, parseFloat(value) || 0);
-    }
+    if (onUpdateStartingPoint) onUpdateStartingPoint(parseFloat(startLat) || 0, parseFloat(value) || 0);
+  };
+
+  const handleTargetLatChange = (e) => {
+    const value = e.target.value;
+    setTargetLat(value);
+    if (onUpdateTargetPoint) onUpdateTargetPoint(parseFloat(value) || 0, parseFloat(targetLng) || 0);
+  };
+
+  const handleTargetLngChange = (e) => {
+    const value = e.target.value;
+    setTargetLng(value);
+    if (onUpdateTargetPoint) onUpdateTargetPoint(parseFloat(targetLat) || 0, parseFloat(value) || 0);
   };
 
   const fetchStartingElevation = async () => {
@@ -139,6 +178,23 @@ function InputBar({ onCalculate, startingPoint, onUpdateStartingPoint }) {
 
   return (
     <form className={styles.inputBar} onSubmit={handleSubmit}>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', background: '#e1e5e9', padding: '4px', borderRadius: '8px' }}>
+        <button 
+          type="button" 
+          onClick={() => setMode('forward')}
+          style={{ flex: 1, padding: '8px', border: 'none', background: mode === 'forward' ? '#fff' : 'transparent', borderRadius: '4px', fontWeight: mode === 'forward' ? 'bold' : 'normal', cursor: 'pointer', boxShadow: mode === 'forward' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+        >
+          Forward Sim
+        </button>
+        <button 
+          type="button" 
+          onClick={() => setMode('targeting')}
+          style={{ flex: 1, padding: '8px', border: 'none', background: mode === 'targeting' ? '#fff' : 'transparent', borderRadius: '4px', fontWeight: mode === 'targeting' ? 'bold' : 'normal', cursor: 'pointer', boxShadow: mode === 'targeting' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+        >
+          Targeting
+        </button>
+      </div>
+
       <h3>Presets</h3>
       <div className={styles.field} style={{ marginBottom: '10px' }}>
         <select 
@@ -204,43 +260,94 @@ function InputBar({ onCalculate, startingPoint, onUpdateStartingPoint }) {
         </div>
       </div>
 
+      {mode === 'targeting' && (
+        <>
+          <h3 style={{ color: '#e53e3e' }}>Target Location (Inverse Sim)</h3>
+          <p style={{ fontSize: '12px', color: '#666', margin: '4px 0 12px 0' }}>Right-click on the map to set quickly.</p>
+          <div className={styles.field}>
+            <label htmlFor="targetLat">Target Latitude</label>
+            <input
+              type="number"
+              id="targetLat"
+              value={targetLat}
+              onChange={handleTargetLatChange}
+              placeholder="0.0000"
+              step="0.0001"
+            />
+          </div>
+          <div className={styles.field}>
+            <label htmlFor="targetLng">Target Longitude</label>
+            <input
+              type="number"
+              id="targetLng"
+              value={targetLng}
+              onChange={handleTargetLngChange}
+              placeholder="0.0000"
+              step="0.0001"
+            />
+          </div>
+          <div className={styles.field}>
+            <label htmlFor="solveFor">Solve For...</label>
+            <select 
+              id="solveFor"
+              value={solveFor} 
+              onChange={(e) => setSolveFor(e.target.value)}
+              style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+            >
+              <option value="elevationLow">Elevation Angle (Direct Fire)</option>
+              <option value="elevationHigh">Elevation Angle (Mortar/High Arc)</option>
+              <option value="velocity">Velocity (Given Fixed Arc)</option>
+            </select>
+          </div>
+        </>
+      )}
+
       <h3>Ballistics Parameters</h3>
-      <div className={styles.field}>
-        <label htmlFor="elevationAngle">Elevation Angle (°)</label>
-        <input
-          type="number"
-          id="elevationAngle"
-          value={elevationAngle}
-          onChange={(e) => setElevationAngle(e.target.value)}
-          placeholder="45"
-          min="0"
-          max="90"
-        />
-        <small style={{ color: '#666', fontSize: '12px' }}>Angle above horizontal (0°-90°)</small>
-      </div>
-      <div className={styles.field}>
-        <label htmlFor="azimuthAngle">Azimuth Angle (°)</label>
-        <input
-          type="number"
-          id="azimuthAngle"
-          value={azimuthAngle}
-          onChange={(e) => setAzimuthAngle(e.target.value)}
-          placeholder="0"
-          min="0"
-          max="360"
-        />
-        <small style={{ color: '#666', fontSize: '12px' }}>0°=North, 90°=East, 180°=South, 270°=West</small>
-      </div>
-      <div className={styles.field}>
-        <label htmlFor="velocity">Initial Velocity (m/s)</label>
-        <input
-          type="number"
-          id="velocity"
-          value={velocity}
-          onChange={(e) => setVelocity(e.target.value)}
-          placeholder="300"
-        />
-      </div>
+      
+      {(mode === 'forward' || solveFor === 'velocity') && (
+        <div className={styles.field}>
+          <label htmlFor="elevationAngle">Elevation Angle (°)</label>
+          <input
+            type="number"
+            id="elevationAngle"
+            value={elevationAngle}
+            onChange={(e) => setElevationAngle(e.target.value)}
+            placeholder="45"
+            min="0"
+            max="90"
+          />
+          <small style={{ color: '#666', fontSize: '12px' }}>Angle above horizontal (0°-90°)</small>
+        </div>
+      )}
+
+      {mode === 'forward' && (
+        <div className={styles.field}>
+          <label htmlFor="azimuthAngle">Azimuth Angle (°)</label>
+          <input
+            type="number"
+            id="azimuthAngle"
+            value={azimuthAngle}
+            onChange={(e) => setAzimuthAngle(e.target.value)}
+            placeholder="0"
+            min="0"
+            max="360"
+          />
+          <small style={{ color: '#666', fontSize: '12px' }}>0°=North, 90°=East, 180°=South, 270°=West</small>
+        </div>
+      )}
+
+      {(mode === 'forward' || solveFor.startsWith('elevation')) && (
+        <div className={styles.field}>
+          <label htmlFor="velocity">Initial Velocity (m/s)</label>
+          <input
+            type="number"
+            id="velocity"
+            value={velocity}
+            onChange={(e) => setVelocity(e.target.value)}
+            placeholder="300"
+          />
+        </div>
+      )}
 
       <h3>Environmental Factors</h3>
       <div className={styles.field}>
