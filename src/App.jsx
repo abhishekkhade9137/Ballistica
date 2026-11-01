@@ -224,8 +224,6 @@ function App() {
           onFindSolutions={handleFindSolutions}
           onClearMarkings={handleClearMarkings}
           activeScenario={activeScenario}
-          onSelectScenario={handleSelectScenario}
-          onOpenScenariosModal={() => setScenariosOpen(true)}
           startingPoint={startingPoint}
           targetPoint={targetPoint}
           placementMode={placementMode}
