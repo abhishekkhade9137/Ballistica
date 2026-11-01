@@ -27,7 +27,7 @@ describe('Ballistica C2 — Historical Tactical Presets Suite', () => {
     });
   });
 
-  test('Battle of Tololing (1999) mountain assault has viable targeting solution', () => {
+  test('Battle of Tololing (1999) Direct Fire mountain assault is viable and clear', () => {
     const tololing = HISTORICAL_PRESETS.find((p) => p.id === 'tololing-1999');
     const params = {
       startLat: tololing.batteryCoords.lat,
@@ -50,12 +50,41 @@ describe('Ballistica C2 — Historical Tactical Presets Suite', () => {
     };
 
     const solution = calculateAllTargetingSolutions(params, tololing.targetCoords);
-    assert.ok(solution.hasViableSolution, 'Tololing must have a viable targeting solution');
-    const active = solution.directFire || solution.highArc;
-    assert.ok(active.config.elevationAngle > 0, 'QE must be positive');
+    assert.ok(solution.directFire, 'Tololing must have direct fire available');
+    assert.equal(solution.directFire.result.collision, null, 'Direct fire must clear without collision');
+    assert.ok(solution.directFire.config.elevationAngle > 5 && solution.directFire.config.elevationAngle < 30, 'QE must be realistic direct angle');
+    assert.ok(parseFloat(solution.directFire.result.analysis.timeOfFlight) < 10, 'Direct shot flight time must be under 10 seconds');
   });
 
-  test('Battle of Longewala (1971) solves long-range desert ballistics (>14km)', () => {
+  test('Tiger Hill Bombardment (1999) High-Arc Plunging Fire is viable and clear', () => {
+    const tigerHill = HISTORICAL_PRESETS.find((p) => p.id === 'tiger-hill-1999');
+    const params = {
+      startLat: tigerHill.batteryCoords.lat,
+      startLng: tigerHill.batteryCoords.lng,
+      startElevation: tigerHill.startElevation,
+      targetElevation: tigerHill.targetElevation,
+      velocity: 827,
+      mass: 43.2,
+      dragCoeff: 0.0019,
+      calibre: 0.155,
+      barrelTwist: 3.10,
+      windSpeed: tigerHill.weather.windSpeed,
+      windDirection: tigerHill.weather.windDirection,
+      groundTempC: tigerHill.weather.groundTempC,
+      groundPressureHpa: tigerHill.weather.groundPressureHpa,
+      gravity: 9.81,
+      mode: 'targeting',
+      solveFor: 'both',
+      targetLatLng: tigerHill.targetCoords,
+    };
+
+    const solution = calculateAllTargetingSolutions(params, tigerHill.targetCoords);
+    assert.ok(solution.highArc, 'Tiger Hill must have high-arc plunging solution');
+    assert.equal(solution.highArc.result.collision, null, 'High-arc must clear crests without collision');
+    assert.ok(solution.highArc.config.elevationAngle > 60, 'High-arc QE must exceed 60 degrees');
+  });
+
+  test('Battle of Longewala (1971) Direct Fire solves long-range desert ballistics (>14km)', () => {
     const longewala = HISTORICAL_PRESETS.find((p) => p.id === 'longewala-1971');
     const params = {
       startLat: longewala.batteryCoords.lat,
@@ -78,8 +107,37 @@ describe('Ballistica C2 — Historical Tactical Presets Suite', () => {
     };
 
     const solution = calculateAllTargetingSolutions(params, longewala.targetCoords);
-    assert.ok(solution.directFire || solution.highArc, 'Longewala must have at least one viable solution');
+    assert.ok(solution.directFire, 'Longewala must have a direct fire solution');
+    assert.equal(solution.directFire.result.collision, null, 'Longewala direct fire must have no collision');
     assert.ok(solution.targetRange > 13000, `Range must exceed 13km, got ${solution.targetRange}`);
+  });
+
+  test('Siege of Dien Bien Phu (1954) negative elevation downhill direct-fire is viable', () => {
+    const dbp = HISTORICAL_PRESETS.find((p) => p.id === 'dien-bien-phu-1954');
+    const params = {
+      startLat: dbp.batteryCoords.lat,
+      startLng: dbp.batteryCoords.lng,
+      startElevation: dbp.startElevation,
+      targetElevation: dbp.targetElevation,
+      velocity: 1000,
+      mass: 0.96,
+      dragCoeff: 0.00015,
+      calibre: 0.040,
+      barrelTwist: 1.0,
+      windSpeed: dbp.weather.windSpeed,
+      windDirection: dbp.weather.windDirection,
+      groundTempC: dbp.weather.groundTempC,
+      groundPressureHpa: dbp.weather.groundPressureHpa,
+      gravity: 9.81,
+      mode: 'targeting',
+      solveFor: 'both',
+      targetLatLng: dbp.targetCoords,
+    };
+
+    const solution = calculateAllTargetingSolutions(params, dbp.targetCoords);
+    assert.ok(solution.directFire, 'Dien Bien Phu must have direct fire solution');
+    assert.equal(solution.directFire.result.collision, null);
+    assert.ok(solution.directFire.config.elevationAngle < 5, 'Downhill shot must have low/negative elevation angle');
   });
 
   test('Battle of 73 Easting (1991) crosswind forces automated mils deflection compensation', () => {
@@ -105,8 +163,7 @@ describe('Ballistica C2 — Historical Tactical Presets Suite', () => {
     };
 
     const solution = calculateAllTargetingSolutions(params, easting.targetCoords);
-    const active = solution.directFire || solution.highArc;
-    assert.ok(active, 'Must find a viable firing solution for 73 Easting');
-    assert.notEqual(active.config.layingDeflectionMils, 0, 'Crosswind + spin drift must require non-zero mils laying deflection');
+    assert.ok(solution.directFire, 'Must find direct fire solution for 73 Easting');
+    assert.notEqual(solution.directFire.config.deflectionMils, 0, 'Crosswind + spin drift must require non-zero mils laying deflection');
   });
 });
