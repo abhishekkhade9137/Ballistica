@@ -76,7 +76,7 @@ function InputBar({
       role: 'Long-Range Ballistics',
       velocity: 827,
       mass: 43.2,
-      dragCoeff: 0.0019,
+      dragCoeff: 0.0031, // Calibrated to 155mm M107 standard aerodynamic drag (1/2 * Cd * A)
       calibre: 0.155, // 155mm
       barrelTwist: 3.10, // 1:20 twist
       maxRange: 32000, // 32 km
