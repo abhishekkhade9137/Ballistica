@@ -450,7 +450,8 @@ export function calculateTrajectory(params) {
     );
 
     // Track crest clearance after clearing launch point (> 50m)
-    const terminalBuffer = Math.min(150, Math.max(60, estimatedTotalRange * 0.015));
+    // Terminal buffer prevents final target touchdown from falsely triggering en-route crest collision
+    const terminalBuffer = Math.min(250, Math.max(100, estimatedTotalRange * 0.035));
     const isEnRoute = currentGroundDist > 50 && currentGroundDist < (estimatedTotalRange - terminalBuffer);
 
     if (currentGroundDist > 50) {
@@ -477,6 +478,11 @@ export function calculateTrajectory(params) {
         }
         break; // Flight abruptly terminates upon hitting mountain!
       }
+
+      // Terminal touchdown: projectile impacts ground at the target objective
+      if (currentGroundDist >= (estimatedTotalRange - terminalBuffer) && absAlt <= terrainAlt) {
+        break;
+      }
     }
 
     vx += ax * dt;
@@ -497,6 +503,11 @@ export function calculateTrajectory(params) {
 
     if (stepCount >= MIN_FLIGHT_STEPS && !peaked && vz < 0) {
       peaked = true;
+    }
+
+    // Direct fire uphill impact: shell reaches target ground elevation at target range
+    if (targetElevation > startElevation && currentGroundDist >= estimatedTotalRange && currentAbsAlt <= targetElevation + 10) {
+      break;
     }
 
     // Stop once past apex and descending to target surface elevation
