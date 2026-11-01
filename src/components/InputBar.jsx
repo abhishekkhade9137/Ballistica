@@ -54,6 +54,16 @@ function InputBar({
       barrelTwist: 1.00,
       maxRange: 4200, // 4.2 km
     },
+    mediumHowitzer: {
+      name: 'Medium Field Howitzer (105mm)',
+      role: 'Mountain & Field Artillery',
+      velocity: 472,
+      mass: 14.9,
+      dragCoeff: 0.00045,
+      calibre: 0.105, // 105mm
+      barrelTwist: 2.10,
+      maxRange: 11500, // 11.5 km
+    },
     rapidAutocannon: {
       name: 'Rapid-Fire Autocannon',
       role: 'Close-In Defence',
@@ -212,6 +222,7 @@ function InputBar({
       solveFor: 'both',
       targetLatLng: targetPoint,
       gunName: currentGun.name,
+      maxRange: currentGun.maxRange,
     };
 
     if (onFindSolutions) {

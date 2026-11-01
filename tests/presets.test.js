@@ -119,11 +119,12 @@ describe('Ballistica C2 — Historical Tactical Presets Suite', () => {
       startLng: dbp.batteryCoords.lng,
       startElevation: dbp.startElevation,
       targetElevation: dbp.targetElevation,
-      velocity: 1000,
-      mass: 0.96,
-      dragCoeff: 0.00015,
-      calibre: 0.040,
-      barrelTwist: 1.0,
+      velocity: 472,
+      mass: 14.9,
+      dragCoeff: 0.00045,
+      calibre: 0.105,
+      barrelTwist: 2.10,
+      maxRange: 11500,
       windSpeed: dbp.weather.windSpeed,
       windDirection: dbp.weather.windDirection,
       groundTempC: dbp.weather.groundTempC,
@@ -137,7 +138,38 @@ describe('Ballistica C2 — Historical Tactical Presets Suite', () => {
     const solution = calculateAllTargetingSolutions(params, dbp.targetCoords);
     assert.ok(solution.directFire, 'Dien Bien Phu must have direct fire solution');
     assert.equal(solution.directFire.result.collision, null);
-    assert.ok(solution.directFire.config.elevationAngle < 5, 'Downhill shot must have low/negative elevation angle');
+    assert.ok(solution.directFire.config.elevationAngle > 0 && solution.directFire.config.elevationAngle < 15, 'Downhill shot must have realistic direct elevation angle');
+  });
+
+  test('Strict weapon operational maxRange enforcement rejects out-of-range targets', () => {
+    const dbp = HISTORICAL_PRESETS.find((p) => p.id === 'dien-bien-phu-1954');
+    // Equipping a short-range 40mm Medium Autocannon (maxRange: 4200m) for a 5795m target
+    const outOfRangeParams = {
+      startLat: dbp.batteryCoords.lat,
+      startLng: dbp.batteryCoords.lng,
+      startElevation: dbp.startElevation,
+      targetElevation: dbp.targetElevation,
+      velocity: 1000,
+      mass: 0.96,
+      dragCoeff: 0.00015,
+      calibre: 0.040,
+      barrelTwist: 1.0,
+      maxRange: 4200,
+      windSpeed: dbp.weather.windSpeed,
+      windDirection: dbp.weather.windDirection,
+      groundTempC: dbp.weather.groundTempC,
+      groundPressureHpa: dbp.weather.groundPressureHpa,
+      gravity: 9.81,
+      mode: 'targeting',
+      solveFor: 'both',
+      targetLatLng: dbp.targetCoords,
+    };
+
+    const solution = calculateAllTargetingSolutions(outOfRangeParams, dbp.targetCoords);
+    assert.equal(solution.hasViableSolution, false, 'Out-of-range target must not have a viable solution');
+    assert.equal(solution.directFire, null, 'Direct fire must be null when out of range');
+    assert.equal(solution.highArc, null, 'High arc must be null when out of range');
+    assert.ok(solution.directReason.includes('beyond weapon operational max range'), 'Must state out of range reason');
   });
 
   test('Battle of 73 Easting (1991) crosswind forces automated mils deflection compensation', () => {

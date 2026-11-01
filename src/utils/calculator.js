@@ -788,6 +788,21 @@ export function calculateAllTargetingSolutions(params, targetLatLng) {
   const startPos = { lat: params.startLat, lng: params.startLng };
   const targetRange = haversineDistance(startPos, targetLatLng);
   const terrainProfile = params.terrainProfile || null;
+  const maxRange = params.maxRange || Infinity;
+
+  // Strict weapon operational envelope enforcement:
+  // If target range exceeds weapon's maximum rated operational limit, reject firing solutions
+  if (targetRange > maxRange) {
+    return {
+      targetRange: parseFloat(targetRange.toFixed(1)),
+      hasViableSolution: false,
+      directFire: null,
+      highArc: null,
+      directReason: `Target beyond weapon operational max range (${(targetRange / 1000).toFixed(2)} km > ${(maxRange / 1000).toFixed(1)} km max)`,
+      highArcReason: `Target beyond weapon operational max range (${(targetRange / 1000).toFixed(2)} km > ${(maxRange / 1000).toFixed(1)} km max)`,
+      blockedTrajectory: null,
+    };
+  }
 
   // 1. Solve Direct Fire (Low Angle, < 45 deg)
   let directSol = null;
