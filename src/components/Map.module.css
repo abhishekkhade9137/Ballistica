@@ -1,9 +1,178 @@
-.leafletContainer {
-  height: 600px;
-  width: 100%;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e1e5e9;
+.mapWrapper {
+  position: relative;
   flex: 2;
-  min-width: 400px;
+  min-width: 500px;
+  height: 850px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-color);
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  background: #0f172a;
+}
+
+.leafletContainer {
+  height: 100%;
+  width: 100%;
+  background: #090d16;
+}
+
+/* Tactical Corner Crosshairs */
+.mapWrapper::before,
+.mapWrapper::after {
+  content: '';
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.mapWrapper::before {
+  top: 12px;
+  left: 12px;
+  border-top: 2px solid var(--accent-cyan);
+  border-left: 2px solid var(--accent-cyan);
+}
+
+.mapWrapper::after {
+  bottom: 12px;
+  right: 12px;
+  border-bottom: 2px solid var(--accent-cyan);
+  border-right: 2px solid var(--accent-cyan);
+}
+
+/* Top Unified Map Controls Ribbon (Pins Left & Right with Zero Collisions) */
+.topControlsBar {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  right: 18px;
+  z-index: 12;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+}
+
+.placementButtons {
+  display: flex;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1.5px solid var(--border-color);
+  border-radius: 8px;
+  padding: 4px;
+  gap: 6px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+
+.placementBtn {
+  background: transparent;
+  border: 1.5px solid transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.placementBtn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.placementBtn.activeBattery {
+  background: rgba(0, 229, 255, 0.2);
+  color: #00e5ff;
+  border-color: #00e5ff;
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.35);
+}
+
+.placementBtn.activeTarget {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border-color: #ef4444;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.35);
+}
+
+/* Layer Control Switcher (Pinned to Top Right) */
+.layerControl {
+  display: flex;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1.5px solid var(--border-color);
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+
+.layerBtn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-hud);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: uppercase;
+}
+
+.layerBtn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.layerBtn.active {
+  background: rgba(0, 229, 255, 0.18);
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
+}
+
+/* Real-time Cursor Coordinates Bar (Bottom Right) */
+.coordsBar {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 12;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1.5px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.gridBadge {
+  color: var(--accent-green);
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.coordsHint {
+  color: var(--text-secondary);
+  font-size: 12px;
 }

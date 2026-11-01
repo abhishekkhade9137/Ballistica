@@ -1,145 +1,411 @@
 .analysisContainer {
-  background-color: #ffffff;
-  border: 1px solid #e1e5e9;
-  border-radius: 8px;
-  padding: 20px;
-  margin: 20px 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  border: 1.5px solid var(--border-color);
+  border-radius: 12px;
+  padding: 28px;
+  margin-top: 24px;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.45);
+  color: var(--text-primary);
 }
 
-.analysisContainer h2 {
-  color: #667eea;
-  margin-top: 0;
-  margin-bottom: 20px;
+/* Dedicated Bottom Trajectory Solution Selector Ribbon */
+.trajectorySelectorBar {
+  background: #090d16;
+  border: 1.5px solid var(--border-color);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.selectorHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.selectorTitle {
+  font-size: 13px;
+  font-family: var(--font-hud);
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.selectorSub {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.selectorButtonGroup {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.selectorBtn {
+  background: #111827;
+  border: 1.5px solid var(--border-color);
+  border-radius: 8px;
+  padding: 14px 18px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.selectorBtn:hover {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.selectorBtn.activeDirectBtn {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.25);
+}
+
+.selectorBtn.activeHighArcBtn {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: #10b981;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.25);
+}
+
+.btnRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btnTitle {
+  font-size: 14px;
+  font-family: var(--font-hud);
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.btnTag {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+}
+
+.activeDirectBtn .btnTag {
+  background: rgba(0, 229, 255, 0.25);
+  color: #00e5ff;
+}
+
+.activeHighArcBtn .btnTag {
+  background: rgba(16, 185, 129, 0.25);
+  color: #10b981;
+}
+
+.btnMetrics {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+/* Dedicated No Solution Status Panel */
+.noSolutionContainer {
+  background: #090d16;
+  border: 1.5px solid rgba(239, 68, 68, 0.5);
+  border-radius: 12px;
+  padding: 28px;
+  margin-top: 24px;
+  box-shadow: 0 10px 36px rgba(239, 68, 68, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.noSolutionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.warningBadge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-family: var(--font-hud);
+  font-weight: 800;
+  color: #ef4444;
+  letter-spacing: 0.8px;
+}
+
+.warningIcon {
+  font-size: 20px;
+}
+
+.targetRangePill {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: #ffffff;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-weight: 700;
+}
+
+.noSolutionSubtext {
+  font-size: 14px;
+  color: #cbd5e1;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.reasonsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.reasonCard {
+  background: #111827;
+  border: 1.5px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reasonTitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  font-family: var(--font-hud);
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.blockedPill {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.reasonDesc {
+  font-size: 13px;
+  color: #94a3b8;
+  font-family: var(--font-mono);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.recommendationBox {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  padding: 14px 18px;
+  font-size: 13px;
+  color: #fef08a;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  line-height: 1.4;
+}
+
+.recommendationBadge {
+  background: #f59e0b;
+  color: #0f172a;
+  font-size: 11px;
+  font-family: var(--font-hud);
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.6px;
+}
+
+/* Inverse Banner */
+.inverseBanner {
+  background: #090d16;
+  border: 1.5px solid var(--border-color);
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 24px;
+}
+
+.solutionCardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.solutionCard {
+  background: #111827;
+  padding: 16px 20px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.solutionCard.primary {
+  border-color: rgba(0, 229, 255, 0.4);
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.15);
+}
+
+.solutionCard.secondary {
+  border-color: rgba(16, 185, 129, 0.4);
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.15);
+}
+
+.solutionLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-family: var(--font-hud);
+  letter-spacing: 0.8px;
+  font-weight: 700;
+}
+
+.solutionValue {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  line-height: 1.1;
+}
+
+.sectionTitle {
   font-size: 1.5rem;
-  border-bottom: 2px solid #667eea;
-  padding-bottom: 10px;
+  font-weight: 800;
+  font-family: var(--font-hud);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1.5px solid var(--border-color);
 }
 
 .metricsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-  margin-bottom: 25px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
 }
 
 .metricCard {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 15px;
+  background: #090d16;
+  border: 1.5px solid var(--border-color);
+  padding: 18px 20px;
   border-radius: 8px;
-  text-align: center;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s ease;
 }
 
 .metricCard:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 4px 18px rgba(0, 229, 255, 0.2);
 }
 
 .metricCard h3 {
-  margin: 0 0 8px 0;
-  font-size: 0.9rem;
-  font-weight: 600;
-  opacity: 0.9;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-family: var(--font-hud);
+  margin-bottom: 8px;
 }
 
 .value {
   font-size: 1.8rem;
-  font-weight: bold;
-  margin: 8px 0;
-  font-family: 'Courier New', monospace;
-}
-
-.label {
-  font-size: 0.8rem;
-  opacity: 0.8;
+  font-weight: 800;
+  color: #ffffff;
+  font-family: var(--font-mono);
   margin: 0;
+  line-height: 1.1;
 }
 
-.summary {
-  background-color: #f8f9fa;
-  border-left: 4px solid #667eea;
-  padding: 15px;
-  border-radius: 4px;
+/* 2D Altitude Profile Chart */
+.chartContainer {
+  background: #090d16;
+  border: 1.5px solid var(--border-color);
+  border-radius: 10px;
+  padding: 24px;
 }
 
-.summary h3 {
-  color: #667eea;
-  margin-top: 0;
+.chartHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-.summary ul {
-  list-style: none;
-  padding: 0;
+.chartTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
   margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
 }
 
-.summary li {
-  padding: 8px 0;
-  color: #333;
-  line-height: 1.6;
-  border-bottom: 1px solid #e1e5e9;
+.svgProfile {
+  width: 100%;
+  height: 250px;
+  background: rgba(10, 15, 29, 0.75);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.4);
 }
 
-.summary li:last-child {
-  border-bottom: none;
+.chartLegend {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
 }
 
-.summary strong {
-  color: #667eea;
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
   font-weight: 600;
+  color: var(--text-secondary);
+  font-family: var(--font-hud);
 }
 
-@media (max-width: 768px) {
-  .metricsGrid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 10px;
-  }
-
-  .metricCard {
-    padding: 12px;
-  }
-
-  .value {
-    font-size: 1.4rem;
-  }
-
-  .analysisContainer {
-    padding: 15px;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .analysisContainer {
-    background-color: #1f2028;
-    border-color: #2e303a;
-  }
-
-  .metricCard {
-    box-shadow: 0 2px 8px rgba(192, 132, 252, 0.2);
-  }
-
-  .metricCard:hover {
-    box-shadow: 0 4px 12px rgba(192, 132, 252, 0.4);
-  }
-
-  .summary {
-    background-color: #2e303a;
-    border-left-color: #c084fc;
-  }
-
-  .summary h3 {
-    color: #c084fc;
-  }
-
-  .summary strong {
-    color: #c084fc;
-  }
-
-  .summary li {
-    color: #9ca3af;
-    border-bottom-color: #2e303a;
-  }
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }

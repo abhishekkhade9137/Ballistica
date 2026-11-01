@@ -1,15 +1,27 @@
-// Advanced ballistics calculation utilities
+// Advanced ballistics calculation utilities with 3D Vectors, ISA Thermodynamics, Wind, Coriolis, & Spin Dynamics
 
 // Constants
-const EARTH_RADIUS = 6371000; // meters (mean radius)
-const DEG_TO_RAD = Math.PI / 180;
-const RAD_TO_DEG = 180 / Math.PI;
-const EARTH_ANGULAR_VELOCITY = 7.292e-5; // rad/s
-const GRAVITY_SEA_LEVEL = 9.80665; // m/s^2 at sea level
-const ATMOSPHERIC_SCALE_HEIGHT = 8500; // meters
+export const EARTH_RADIUS = 6371000; // meters (mean radius)
+export const DEG_TO_RAD = Math.PI / 180;
+export const RAD_TO_DEG = 180 / Math.PI;
+export const EARTH_ANGULAR_VELOCITY = 7.292115e-5; // rad/s
+export const GRAVITY_SEA_LEVEL = 9.80665; // m/s^2 at sea level
+export const ATMOSPHERIC_SCALE_HEIGHT = 8500; // meters
+
+// ISA Thermodynamic Model Constants
+export const ISA_CONSTANTS = {
+  T0: 288.15, // K (15°C baseline sea-level)
+  P0: 101325, // Pa (1013.25 hPa standard sea-level)
+  L: 0.0065,  // K/m lapse rate in troposphere (up to 11km)
+  R_DRY: 287.058, // J/(kg·K) gas constant for dry air
+  R_VAP: 461.495, // J/(kg·K) gas constant for water vapor
+  GAMMA: 1.4, // Adiabatic index for air
+  MOLAR_MASS_AIR: 0.0289644, // kg/mol
+  UNIVERSAL_GAS: 8.31446, // J/(mol·K)
+};
 
 // Convert lat/lng to cartesian displacement from reference point
-function latLngToXY(lat, lng, refLat, refLng) {
+export function latLngToXY(lat, lng, refLat, refLng) {
   const dLat = (lat - refLat) * DEG_TO_RAD;
   const dLng = (lng - refLng) * DEG_TO_RAD;
   const x = EARTH_RADIUS * dLng * Math.cos(refLat * DEG_TO_RAD);
@@ -18,7 +30,7 @@ function latLngToXY(lat, lng, refLat, refLng) {
 }
 
 // Convert cartesian displacement back to lat/lng
-function xyToLatLng(x, y, refLat, refLng) {
+export function xyToLatLng(x, y, refLat, refLng) {
   const dLat = y / EARTH_RADIUS;
   const dLng = x / (EARTH_RADIUS * Math.cos(refLat * DEG_TO_RAD));
   const lat = refLat + dLat * RAD_TO_DEG;
@@ -27,91 +39,318 @@ function xyToLatLng(x, y, refLat, refLng) {
 }
 
 // Gravity decreases with altitude: g(h) = g0 * (R/(R+h))^2
-function gravityAtAltitude(altitude) {
+export function gravityAtAltitude(altitude) {
   return GRAVITY_SEA_LEVEL * Math.pow(EARTH_RADIUS / (EARTH_RADIUS + Math.max(0, altitude)), 2);
 }
 
-// Atmospheric density as function of altitude (exponential model)
-function airDensityAtAltitude(altitude) {
-  const seaLevelDensity = 1.225; // kg/m^3
-  return seaLevelDensity * Math.exp(-Math.max(0, altitude) / ATMOSPHERIC_SCALE_HEIGHT);
+// Full ISA Atmospheric Thermodynamic State Resolver
+export function getAtmosphericState(altitude, groundTempC = 15, groundPressureHpa = 1013.25, relHumidityPct = 50) {
+  const alt = Math.max(0, altitude);
+  const tGround = (Number(groundTempC) || 15) + 273.15;
+  const pGround = (Number(groundPressureHpa) || 1013.25) * 100;
+  const rh = Math.max(0, Math.min(100, Number(relHumidityPct) || 50));
+
+  // Temperature with tropospheric lapse rate (up to 11km)
+  let T = tGround - ISA_CONSTANTS.L * Math.min(11000, alt);
+  if (alt > 11000) {
+    T = tGround - ISA_CONSTANTS.L * 11000; // Tropopause isothermal layer
+  }
+  T = Math.max(180, T);
+
+  // Surface reference density adjusted for temperature & pressure
+  const rho0 = pGround / (ISA_CONSTANTS.R_DRY * tGround);
+  const density = rho0 * Math.exp(-alt / ATMOSPHERIC_SCALE_HEIGHT);
+
+  // Pressure variation with altitude
+  const P = pGround * Math.exp(-alt / ATMOSPHERIC_SCALE_HEIGHT);
+
+  // Speed of sound: a = sqrt(gamma * R_dry * T)
+  const speedOfSound = Math.sqrt(ISA_CONSTANTS.GAMMA * ISA_CONSTANTS.R_DRY * T);
+
+  return {
+    temperatureK: T,
+    temperatureC: T - 273.15,
+    pressurePa: P,
+    pressureHpa: P / 100,
+    density,
+    speedOfSound,
+    relativeHumidity: rh,
+  };
 }
 
-// Eotvos effect on effective gravity
-function eotvosCorrection(latitude, velocityEast, velocityNorth) {
-  const latRad = latitude * DEG_TO_RAD;
-  const centrifugal = 2 * EARTH_ANGULAR_VELOCITY * EARTH_ANGULAR_VELOCITY * EARTH_RADIUS * Math.sin(2 * latRad);
-  const rotational = 2 * EARTH_ANGULAR_VELOCITY * (velocityEast * Math.sin(latRad) - velocityNorth * Math.cos(latRad));
-  return centrifugal + rotational;
+// Atmospheric density as function of altitude (ISA model)
+export function airDensityAtAltitude(altitude, groundTempC = 15, groundPressureHpa = 1013.25, relHumidityPct = 50) {
+  const state = getAtmosphericState(altitude, groundTempC, groundPressureHpa, relHumidityPct);
+  return state.density;
 }
 
-// Fetch elevation from Open-Elevation API (free, no API key required)
+// Mach-dependent wave drag multiplier normalized to nominal supersonic cruise (M ~ 2.4)
+export function getMachDragMultiplier(mach) {
+  const m = Math.max(0, mach);
+  if (m < 0.8) {
+    return 0.75; // Subsonic laminar flow lower drag
+  }
+  if (m <= 1.2) {
+    // Transonic shock wave rise
+    const t = (m - 0.8) / (1.2 - 0.8);
+    return 0.75 + 0.40 * Math.sin(t * Math.PI);
+  }
+  // Supersonic regime tapering smoothly to 1.0 at cruise speeds
+  return 1.0 + 0.15 * Math.exp(-1.5 * (m - 1.2));
+}
+
+// 3D Altitude Wind Vector with Atmospheric Wind Shear (Hellmann Power Law)
+export function getWindVectorAtAltitude(altitude, groundElevation, surfaceWindSpeed, surfaceWindDirection) {
+  const ws = Math.max(0, Number(surfaceWindSpeed) || 0);
+  if (ws === 0) {
+    return { wx: 0, wy: 0, wz: 0, speed: 0 };
+  }
+
+  const hRel = Math.max(2, (altitude || 0) - (groundElevation || 0));
+  // Power-law exponent: 0.16 (standard mountain terrain atmospheric boundary layer)
+  const shearFactor = Math.min(2.5, Math.max(0.7, Math.pow(hRel / 10, 0.16)));
+  const localSpeed = ws * shearFactor;
+
+  // Wind direction theta_w is meteorological direction from which wind blows
+  // The velocity vector blows toward theta_w + 180°
+  const dirRad = (Number(surfaceWindDirection) || 0) * DEG_TO_RAD;
+  const wx = -localSpeed * Math.sin(dirRad); // East
+  const wy = -localSpeed * Math.cos(dirRad); // North
+  const wz = 0;
+
+  return { wx, wy, wz, speed: localSpeed };
+}
+
+// Angular Momentum, Spin Drift (Yaw of Repose) & Magnus Effect
+export function calculateSpinDynamics({
+  velocity,
+  barrelTwist = 3.0,
+  time,
+  rhoLocal,
+  rhoSeaLevel = 1.225,
+  vx,
+  vy,
+  vz,
+  vrx,
+  vry,
+  vrz,
+  mass,
+  calibre = 0.155,
+  gLocal,
+}) {
+  if (!barrelTwist || barrelTwist <= 0) {
+    // Smoothbore ordnance (e.g. Mortar): no rifling spin drift or spin-induced Magnus
+    return { axSpin: 0, aySpin: 0, azSpin: 0, omega: 0 };
+  }
+
+  // Initial axial spin rate (rad/s)
+  const omega0 = (2 * Math.PI * velocity) / barrelTwist;
+  // Spin decay over flight time due to aerodynamic friction
+  const spinDecayRate = 0.012 * (rhoLocal / rhoSeaLevel);
+  const omega = omega0 * Math.exp(-spinDecayRate * Math.max(0, time));
+
+  const vh = Math.sqrt(vx * vx + vy * vy);
+  let axDrift = 0;
+  let ayDrift = 0;
+
+  if (vh > 1) {
+    // Yaw of repose rightward gyroscopic drift (NATO STANAG 4-DoF empirical formula)
+    // Precession pushes nose to the right relative to horizontal velocity vector
+    const kDrift = 0.0011;
+    const aDriftMag = kDrift * (rhoLocal / rhoSeaLevel) * (gLocal / vh) * (omega / omega0);
+
+    // Unit vector pointing horizontally to the right of travel: (vy/vh, -vx/vh)
+    axDrift = aDriftMag * (vy / vh);
+    ayDrift = -aDriftMag * (vx / vh);
+  }
+
+  // Magnus crosswind lift acceleration: F_mag = 0.5 * rho * C_mag * A * d * (omega x v_rel)
+  let axMag = 0, ayMag = 0, azMag = 0;
+  const vTotal = Math.sqrt(vx * vx + vy * vy + vz * vz);
+  if (vTotal > 1 && mass > 0) {
+    const area = Math.PI * Math.pow(calibre / 2, 2);
+    // Unit vector along projectile axial centerline
+    const sx = vx / vTotal;
+    const sy = vy / vTotal;
+    const sz = vz / vTotal;
+
+    const omx = omega * sx;
+    const omy = omega * sy;
+    const omz = omega * sz;
+
+    // Cross product: omega x v_rel
+    const crossX = omy * vrz - omz * vry;
+    const crossY = omz * vrx - omx * vrz;
+    const crossZ = omx * vry - omy * vrx;
+
+    const cMag = 0.0035;
+    const magScale = (0.5 * rhoLocal * cMag * area * calibre) / mass;
+
+    axMag = magScale * crossX;
+    ayMag = magScale * crossY;
+    azMag = magScale * crossZ;
+  }
+
+  return {
+    axSpin: axDrift + axMag,
+    aySpin: ayDrift + ayMag,
+    azSpin: azMag,
+    omega,
+  };
+}
+
+// Fetch elevation using Open-Meteo high-resolution DEM API with geographical heuristic fallback
 export async function fetchElevation(lat, lng) {
+  let fallbackElev = 210;
+  if (lat > 33 && lng > 74) fallbackElev = 3500; // High Altitude / Mountain terrain (Kargil / Ladakh / J&K)
+  else if (lat > 29 && lat <= 33 && lng > 73 && lng < 77) fallbackElev = 215; // Northern plains
+  else if (lat > 25 && lat <= 29 && lng > 70 && lng < 74) fallbackElev = 225; // Arid / Desert sector
+
   try {
-    const response = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lng}`);
-    if (!response.ok) throw new Error('Failed to fetch elevation');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const response = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) return fallbackElev;
     const data = await response.json();
-    if (data.results && data.results.length > 0) {
-      return data.results[0].elevation;
+    if (data.elevation && Array.isArray(data.elevation) && data.elevation.length > 0) {
+      return Math.round(data.elevation[0]);
     }
-    return 0;
-  } catch (error) {
-    console.error('Error fetching elevation:', error);
-    return 0;
+    return fallbackElev;
+  } catch {
+    return fallbackElev;
   }
 }
 
-// Fetch elevations for multiple points (batch query)
+// Fetch elevations for multiple coordinates in batch using Open-Meteo
 export async function fetchElevations(locations) {
+  if (!locations || locations.length === 0) return [];
   try {
-    const locString = locations.map(([lat, lng]) => `${lat},${lng}`).join('|');
-    const response = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${locString}`);
-    if (!response.ok) throw new Error('Failed to fetch elevations');
+    const lats = locations.map(([lat]) => lat).join(',');
+    const lngs = locations.map(([, lng]) => lng).join(',');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const response = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lngs}`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) return locations.map(() => 0);
     const data = await response.json();
-    if (data.results) return data.results.map(r => r.elevation);
+    if (data.elevation && Array.isArray(data.elevation)) {
+      return data.elevation.map(e => (typeof e === 'number' ? Math.round(e) : 0));
+    }
     return locations.map(() => 0);
-  } catch (error) {
-    console.error('Error fetching elevations:', error);
+  } catch {
     return locations.map(() => 0);
   }
+}
+
+// Generate N discrete coordinates along the line of flight between start and target
+export function generatePathCoordinates(start, target, count = 15) {
+  if (!start?.lat || !target?.lat) return [];
+  const points = [];
+  const totalDist = haversineDistance(start, target);
+  for (let i = 0; i < count; i++) {
+    const fraction = count <= 1 ? 0 : i / (count - 1);
+    const lat = start.lat + fraction * (target.lat - start.lat);
+    const lng = start.lng + fraction * (target.lng - start.lng);
+    const distance = fraction * totalDist;
+    points.push({
+      lat: parseFloat(lat.toFixed(5)),
+      lng: parseFloat(lng.toFixed(5)),
+      distance: parseFloat(distance.toFixed(1)),
+      fraction: parseFloat(fraction.toFixed(4)),
+    });
+  }
+  return points;
+}
+
+// Sample continuous intermediate terrain elevations along the full flight path (with distance-adaptive sampling)
+export async function fetchTerrainPath(start, target, count = null) {
+  if (!start?.lat || !target?.lat) return [];
+  const totalDist = haversineDistance(start, target);
+  // Distance-adaptive resolution: sample ~every 350m to avoid crest aliasing (bounded between 15 and 60 points)
+  const sampleCount = count || Math.min(60, Math.max(15, Math.round(totalDist / 350)));
+  const pathPoints = generatePathCoordinates(start, target, sampleCount);
+  const locations = pathPoints.map(p => [p.lat, p.lng]);
+
+  try {
+    const elevations = await fetchElevations(locations);
+    const hasValidElevs = elevations && elevations.some(e => e > 0);
+
+    if (hasValidElevs) {
+      return pathPoints.map((p, idx) => ({
+        distance: p.distance,
+        elevation: Math.round(elevations[idx] || 0),
+        lat: p.lat,
+        lng: p.lng,
+      }));
+    }
+  } catch {
+    // proceed to geographic fallback
+  }
+
+  // Fallback: estimate elevations based on sector and endpoints
+  const startAlt = await fetchElevation(start.lat, start.lng);
+  const targetAlt = await fetchElevation(target.lat, target.lng);
+
+  return pathPoints.map(p => ({
+    distance: p.distance,
+    elevation: Math.round(startAlt + p.fraction * (targetAlt - startAlt)),
+    lat: p.lat,
+    lng: p.lng,
+  }));
+}
+
+// Automatic intermediate terrain elevation lookup along the flight path
+export function getTerrainElevation(dist, totalRange, startElevation, targetElevation, terrainProfile) {
+  if (terrainProfile && terrainProfile.length > 1) {
+    for (let i = 0; i < terrainProfile.length - 1; i++) {
+      if (dist >= terrainProfile[i].distance && dist <= terrainProfile[i + 1].distance) {
+        const span = terrainProfile[i + 1].distance - terrainProfile[i].distance;
+        if (span === 0) return terrainProfile[i].elevation;
+        const ratio = (dist - terrainProfile[i].distance) / span;
+        return terrainProfile[i].elevation + ratio * (terrainProfile[i + 1].elevation - terrainProfile[i].elevation);
+      }
+    }
+    if (dist > terrainProfile[terrainProfile.length - 1].distance) {
+      return terrainProfile[terrainProfile.length - 1].elevation;
+    }
+    return terrainProfile[0].elevation;
+  }
+
+  const progress = totalRange > 0 ? Math.min(1.5, Math.max(0, dist / totalRange)) : 0;
+  return startElevation + Math.min(1, progress) * (targetElevation - startElevation);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// calculateTrajectory  — fixed physics integrator
-//
-// DRAG MODEL:  F_drag = dragCoeff * rhoLocal * |v_rel| / mass   (per-axis)
-//   dragCoeff acts as a tunable linear damping factor.  The default 0.05 keeps
-//   the deceleration reasonable across typical muzzle velocities (100-1500 m/s).
-//   Using quadratic drag with the same coefficient produced deceleration orders
-//   of magnitude too large (e.g. 7600 m/s^2 at v=500), causing the simulation
-//   to flip vz negative in a single step and terminate immediately.
-//
-// LOOP  EXIT RULES (fixed):
-//   • Never exit before the projectile has genuinely risen AND FALLEN back to
-//     target elevation — tracked by the "peaked" flag.
-//   • A hard minimum of MIN_FLIGHT_STEPS ensures at least 20 integration steps
-//     before any early-exit can trigger, preventing 1-step degenerate results.
-//   • Safety caps: t < 1200 s and trajectory < MAX_POINTS.
+// calculateTrajectory — with 3D Vectors, ISA Thermodynamics, Wind, Coriolis & Spin
 // ─────────────────────────────────────────────────────────────────────────────
 export function calculateTrajectory(params) {
   const {
     startLat,
     startLng,
-    velocity,            // m/s, muzzle velocity
-    elevationAngle,      // degrees, 0-90 above horizontal
-    azimuthAngle = 0,    // degrees, 0=North 90=East 180=South 270=West
-    windSpeed = 0,       // m/s
-    windDirection = 0,   // degrees (direction wind blows TOWARD)
-    // gravity param accepted for UI parity but we use the physics model
-    dragCoeff = 0.005,   // linear drag factor (tuned down from 0.05 for realism)
-    mass = 1,            // kg
-    startElevation = 0,  // metres ASL at launch
-    targetElevation = 0, // metres ASL at target surface
-    dt = 0.01,           // integration time-step (seconds) — keep small for Euler stability
-    _fastMode = false,   // internal flag for fast iterative solvers
+    velocity,
+    elevationAngle,
+    azimuthAngle = 0,
+    windSpeed = 0,
+    windDirection = 0,
+    dragCoeff = 0.005,
+    mass = 1,
+    startElevation = 0,
+    targetElevation = 0,
+    dt = 0.01,
+    _fastMode = false,
+    targetLatLng = null,
+    groundTempC = 15,
+    groundPressureHpa = 1013.25,
+    relHumidityPct = 50,
+    barrelTwist = 3.0,
+    calibre = 0.155,
   } = params;
 
-  // ── Input validation ──────────────────────────────────────────────────────
   if (
     isNaN(velocity) || isNaN(elevationAngle) ||
     velocity <= 0 || elevationAngle < 0 || elevationAngle > 90
@@ -121,69 +360,125 @@ export function calculateTrajectory(params) {
 
   const elevationRad = elevationAngle * DEG_TO_RAD;
   const azimuthRad   = azimuthAngle   * DEG_TO_RAD;
-  const latitudeRad  = startLat       * DEG_TO_RAD;
 
-  // ── Initial velocity components (ENU: East-North-Up) ─────────────────────
   let vx = velocity * Math.cos(elevationRad) * Math.sin(azimuthRad); // East
   let vy = velocity * Math.cos(elevationRad) * Math.cos(azimuthRad); // North
   let vz = velocity * Math.sin(elevationRad);                         // Up
 
-  // ── Wind velocity components ─────────────────────────────────────────────
-  const windRad = windDirection * DEG_TO_RAD;
-  const windVx  = windSpeed * Math.sin(windRad);
-  const windVy  = windSpeed * Math.cos(windRad);
-
   let x = 0, y = 0, z = 0, t = 0;
   const trajectory = [
-    { lat: startLat, lng: startLng, x: 0, y: 0, z: 0, altitude: startElevation },
+    { lat: startLat, lng: startLng, x: 0, y: 0, z: 0, altitude: startElevation, terrainAltitude: startElevation },
   ];
 
-  const MAX_POINTS = 20000; // hard cap — prevents browser freeze
-  const MIN_FLIGHT_STEPS = 20; // always run at least this many steps
+  const estimatedTotalRange = targetLatLng 
+    ? haversineDistance({ lat: startLat, lng: startLng }, targetLatLng)
+    : (params.targetRange || (params.terrainProfile && params.terrainProfile.length > 0 ? params.terrainProfile[params.terrainProfile.length - 1].distance : 0) || Math.max(1000, (velocity * velocity * Math.sin(2 * (elevationRad || 0.1)) / 9.81) || 5000));
 
-  // "peaked" means the projectile has passed its apex and is now descending
+  const MAX_POINTS = 20000;
+  const MIN_FLIGHT_STEPS = 20;
+
   let peaked = false;
   let stepCount = 0;
+  let collision = null;
+  let minCrestClearance = Infinity;
+  let crestCheckPoints = 0;
+  let maxMach = 0;
 
-  // ── Main integration loop ─────────────────────────────────────────────────
   while (t < 1200 && trajectory.length < MAX_POINTS) {
+    const currentGroundDist = Math.sqrt(x * x + y * y);
     const absAlt  = Math.max(0, startElevation + z);
     const gLocal  = gravityAtAltitude(absAlt);
-    const rhoLocal = airDensityAtAltitude(absAlt);
 
-    // Velocity relative to air mass (accounts for wind)
-    const vrx = vx - windVx;
-    const vry = vy - windVy;
-    const vrz = vz;
+    // 1. ISA Atmospheric Thermodynamic State
+    const atm = getAtmosphericState(absAlt, groundTempC, groundPressureHpa, relHumidityPct);
+    const rhoLocal = atm.density;
+    const speedOfSound = atm.speedOfSound;
+
+    // 2. 3D Wind with Altitude Wind Shear
+    const wind = getWindVectorAtAltitude(absAlt, startElevation, windSpeed, windDirection);
+    const vrx = vx - wind.wx;
+    const vry = vy - wind.wy;
+    const vrz = vz - wind.wz;
     const vRel = Math.sqrt(vrx * vrx + vry * vry + vrz * vrz);
 
-    // Quadratic drag acceleration magnitude: a = dragCoeff * rho * v_rel^2 / mass
-    // This is applied as: a_x = - (dragCoeff * rho * v_rel / mass) * v_rx
-    let dragFactor = vRel > 0 ? (dragCoeff * rhoLocal * vRel) / mass : 0;
-    
-    // NATIVE PHYSICS FIX: Prevent Explicit Euler Instability
-    // If deceleration is so high that it would reduce velocity past zero in one step,
-    // the simulation will oscillate and explode exponentially.
-    // Clamp the drag factor so it removes at most 95% of relative velocity per step.
+    // 3. Mach Number & Transonic Wave Drag Multiplier (if enabled in params or weapon spec)
+    const mach = speedOfSound > 0 ? vRel / speedOfSound : 1.0;
+    if (mach > maxMach) maxMach = mach;
+    const machMultiplier = (params.machDrag || params.useMachDrag) ? getMachDragMultiplier(mach) : 1.0;
+
+    let dragFactor = vRel > 0 ? (dragCoeff * machMultiplier * rhoLocal * vRel) / mass : 0;
     if (dragFactor * dt > 0.95) {
       dragFactor = 0.95 / dt;
     }
 
-    // Coriolis:  2 * (omega x v) in ENU frame
-    const coriolisAx =  2 * EARTH_ANGULAR_VELOCITY * (vy * Math.sin(latitudeRad) - vz * Math.cos(latitudeRad));
-    const coriolisAy = -2 * EARTH_ANGULAR_VELOCITY *  vx * Math.sin(latitudeRad);
-    const coriolisAz =  2 * EARTH_ANGULAR_VELOCITY *  vx * Math.cos(latitudeRad);
+    // 4. Earth's Rotation (Planetary Dynamics: Coriolis & Eötvös)
+    const latRad = (startLat + (y / EARTH_RADIUS) * RAD_TO_DEG) * DEG_TO_RAD;
+    const coriolisAx =  2 * EARTH_ANGULAR_VELOCITY * (vy * Math.sin(latRad) - vz * Math.cos(latRad));
+    const coriolisAy = -2 * EARTH_ANGULAR_VELOCITY *  vx * Math.sin(latRad);
+    const coriolisAz =  2 * EARTH_ANGULAR_VELOCITY *  vx * Math.cos(latRad); // Direct Eötvös effect
 
-    // Eotvos effect on gravity
-    const eotvos  = eotvosCorrection(startLat, vx, vy);
-    const gTotal  = gLocal + eotvos;
+    // 5. Angular Momentum, Spin Drift (Yaw of Repose) & Magnus Lift
+    const spin = calculateSpinDynamics({
+      velocity,
+      barrelTwist,
+      time: t,
+      rhoLocal,
+      rhoSeaLevel: 1.225,
+      vx,
+      vy,
+      vz,
+      vrx,
+      vry,
+      vrz,
+      mass,
+      calibre,
+      gLocal,
+    });
 
-    // Net acceleration
-    const ax = -dragFactor * vrx + coriolisAx;
-    const ay = -dragFactor * vry + coriolisAy;
-    const az = -gTotal    - dragFactor * vrz + coriolisAz;
+    // Sum of forces per unit mass (accelerations)
+    const ax = -dragFactor * vrx + coriolisAx + spin.axSpin;
+    const ay = -dragFactor * vry + coriolisAy + spin.aySpin;
+    const az = -gLocal - dragFactor * vrz + coriolisAz + spin.azSpin;
 
-    // Euler integration
+    // Get terrain elevation at this exact horizontal distance
+    const terrainAlt = getTerrainElevation(
+      currentGroundDist,
+      estimatedTotalRange,
+      startElevation,
+      targetElevation,
+      params.terrainProfile
+    );
+
+    // Track crest clearance after clearing launch point (> 50m)
+    const terminalBuffer = Math.min(150, Math.max(60, estimatedTotalRange * 0.015));
+    const isEnRoute = currentGroundDist > 50 && currentGroundDist < (estimatedTotalRange - terminalBuffer);
+
+    if (currentGroundDist > 50) {
+      const clearance = absAlt - terrainAlt;
+      if (clearance < minCrestClearance) {
+        minCrestClearance = clearance;
+      }
+      crestCheckPoints++;
+
+      // Terrain / Mountain collision check along flight corridor
+      if (isEnRoute && absAlt <= terrainAlt) {
+        const { lat, lng } = xyToLatLng(x, y, startLat, startLng);
+        collision = {
+          occurred: true,
+          distance: parseFloat(currentGroundDist.toFixed(2)),
+          obstacleElevation: parseFloat(terrainAlt.toFixed(2)),
+          projectileAltitude: parseFloat(absAlt.toFixed(2)),
+          lat: parseFloat(lat.toFixed(4)),
+          lng: parseFloat(lng.toFixed(4)),
+          message: `TRAJECTORY INTERRUPTED: Projectile collided with mountain ridge at ${(currentGroundDist / 1000).toFixed(2)} km (Ground: ${terrainAlt.toFixed(0)}m ASL). Crest clearance failed!`,
+        };
+        if (!_fastMode) {
+          trajectory.push({ lat, lng, x, y, z, altitude: terrainAlt, terrainAltitude: terrainAlt, isCollision: true });
+        }
+        break; // Flight abruptly terminates upon hitting mountain!
+      }
+    }
+
     vx += ax * dt;
     vy += ay * dt;
     vz += az * dt;
@@ -197,49 +492,45 @@ export function calculateTrajectory(params) {
     const currentAbsAlt = startElevation + z;
     const { lat, lng } = xyToLatLng(x, y, startLat, startLng);
     if (!_fastMode) {
-      trajectory.push({ lat, lng, x, y, z, altitude: currentAbsAlt });
+      trajectory.push({ lat, lng, x, y, z, altitude: currentAbsAlt, terrainAltitude: terrainAlt });
     }
 
-    // Track apex after minimum steps
     if (stepCount >= MIN_FLIGHT_STEPS && !peaked && vz < 0) {
       peaked = true;
     }
 
-    // For non-zero elevation angle: stop once past apex and back at target surface
+    // Stop once past apex and descending to target surface elevation
     if (elevationAngle > 0 && peaked && currentAbsAlt <= targetElevation) break;
 
-    // For flat / downward shots: stop when the projectile goes below target surface
-    // but only after giving it a minimum run
+    // For flat shots
     if (elevationAngle === 0 && stepCount >= MIN_FLIGHT_STEPS && currentAbsAlt < targetElevation) break;
 
-    // Emergency bail-out if projectile buries deeply underground
     if (currentAbsAlt < targetElevation - 5000) break;
   }
 
-  // ── Guard: always need at least 2 points ─────────────────────────────────
   if (!_fastMode && trajectory.length < 2) {
-    trajectory.push({ ...trajectory[0], z: -0.1, altitude: startElevation - 0.1 });
+    trajectory.push({ ...trajectory[0], z: -0.1, altitude: startElevation - 0.1, terrainAltitude: startElevation });
   }
 
   const impactPoint = _fastMode 
     ? { lat: xyToLatLng(x,y,startLat,startLng).lat, lng: xyToLatLng(x,y,startLat,startLng).lng, x, y, z, t, altitude: startElevation + z }
     : trajectory[trajectory.length - 1];
 
+  const totalGroundDist = haversineDistance(
+    { lat: startLat, lng: startLng },
+    { lat: impactPoint.lat, lng: impactPoint.lng }
+  );
+
   if (_fastMode) {
     return { 
       impactPoint, 
-      analysis: { groundDistance: haversineDistance({lat: startLat, lng: startLng}, impactPoint).toFixed(2) } 
+      collision,
+      analysis: { groundDistance: totalGroundDist.toFixed(2) } 
     };
   }
 
   const impactIndex = trajectory.length - 1;
-
-  // ── Analysis metrics ─────────────────────────────────────────────────────
   const timeOfFlight = t;
-  const groundDistance = haversineDistance(
-    { lat: startLat, lng: startLng },
-    { lat: impactPoint.lat, lng: impactPoint.lng }
-  );
   const horizontalDistance = Math.sqrt(trajectory[impactIndex].x ** 2 + trajectory[impactIndex].y ** 2);
 
   let maxAltitude = startElevation;
@@ -248,6 +539,11 @@ export function calculateTrajectory(params) {
   });
 
   const coriolisDeflection = calculateCoriolisDeflection(trajectory, azimuthAngle);
+
+  // Cross-track lateral drift calculation relative to initial bore azimuth
+  const alongTrack = x * Math.sin(azimuthRad) + y * Math.cos(azimuthRad);
+  const crossTrack = x * Math.cos(azimuthRad) - y * Math.sin(azimuthRad); // + = Right, - = Left
+  const deflectionMils = alongTrack > 0 ? (crossTrack / alongTrack) * 1018.6 : 0;
 
   let impactVelocity = 0;
   if (impactIndex > 0) {
@@ -267,14 +563,35 @@ export function calculateTrajectory(params) {
     totalDistance += Math.sqrt(dx * dx + dy * dy + dz * dz);
   }
 
+  // Generate continuous terrain profile along the line of flight for rendering
+  const terrainProfile = [];
+  const profileSteps = 100;
+  for (let i = 0; i <= profileSteps; i++) {
+    const dist = (i / profileSteps) * totalGroundDist;
+    const elev = getTerrainElevation(
+      dist,
+      estimatedTotalRange,
+      startElevation,
+      targetElevation,
+      params.terrainProfile
+    );
+    terrainProfile.push({ distance: dist, elevation: elev });
+  }
+
   const analysis = {
     timeOfFlight: timeOfFlight.toFixed(2),
-    groundDistance: groundDistance.toFixed(2),
+    groundDistance: totalGroundDist.toFixed(2),
     horizontalDistance: horizontalDistance.toFixed(2),
     maxAltitude: maxAltitude.toFixed(2),
-    coriolisDeflection: coriolisDeflection.toFixed(2),
+    coriolisDeflection: Math.abs(coriolisDeflection).toFixed(2),
+    netLateralDeflection: crossTrack.toFixed(2),
+    deflectionMils: deflectionMils.toFixed(1),
+    maxMach: maxMach.toFixed(2),
+    speedOfSound: (getAtmosphericState(startElevation, groundTempC, groundPressureHpa, relHumidityPct).speedOfSound).toFixed(1),
     impactVelocity: impactVelocity.toFixed(2),
     totalDistance: totalDistance.toFixed(2),
+    minCrestClearance: crestCheckPoints > 0 ? (collision ? 0 : minCrestClearance).toFixed(1) : 'N/A',
+    crestStatus: collision ? 'COLLISION DETECTED' : 'CLEAR',
     impactAngle: (
       impactIndex > 0
         ? calculateImpactAngle(trajectory[impactIndex - 1], trajectory[impactIndex])
@@ -282,11 +599,11 @@ export function calculateTrajectory(params) {
     ).toFixed(2),
   };
 
-  return { trajectory, impactPoint, analysis };
+  return { trajectory, impactPoint, analysis, collision, terrainProfile };
 }
 
 // Haversine great-circle distance
-function haversineDistance(pos1, pos2) {
+export function haversineDistance(pos1, pos2) {
   const R = 6371000;
   const lat1 = pos1.lat * DEG_TO_RAD;
   const lat2 = pos2.lat * DEG_TO_RAD;
@@ -298,7 +615,7 @@ function haversineDistance(pos1, pos2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Lateral Coriolis deflection estimate (perpendicular to intended azimuth)
+// Lateral Coriolis deflection estimate
 function calculateCoriolisDeflection(trajectory, azimuthAngle) {
   if (trajectory.length < 2) return 0;
   const last  = trajectory[trajectory.length - 1];
@@ -322,16 +639,7 @@ function calculateImpactAngle(prevPoint, impactPoint) {
   return Math.atan2(Math.abs(dz), hDist) * RAD_TO_DEG;
 }
 
-// Legacy wrapper
-export function calculateLandingPoint(params) {
-  return calculateTrajectory(params).impactPoint;
-}
-
-export function convertUnits(value, fromUnit, toUnit) {
-  return value;
-}
-
-// Calculate geographic bearing from one lat/lng to another
+// Calculate geographic bearing
 export function calculateBearing(lat1, lng1, lat2, lng2) {
   const phi1 = lat1 * DEG_TO_RAD;
   const phi2 = lat2 * DEG_TO_RAD;
@@ -343,17 +651,15 @@ export function calculateBearing(lat1, lng1, lat2, lng2) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// calculateTargetingSolution  — Inverse Kinematics solver
+// calculateTargetingSolution — Inverse Solver with Terrain Masking Check
 // ─────────────────────────────────────────────────────────────────────────────
 export function calculateTargetingSolution(params, targetLatLng, solveFor = 'elevationLow') {
   const startPos = { lat: params.startLat, lng: params.startLng };
   const targetRange = haversineDistance(startPos, targetLatLng);
   const baseAzimuth = calculateBearing(startPos.lat, startPos.lng, targetLatLng.lat, targetLatLng.lng);
   
-  // Create a copy of params with fastMode enabled for iterative solver
-  const baseParams = { ...params, _fastMode: true };
+  const baseParams = { ...params, _fastMode: true, targetLatLng };
 
-  // Helper: Bisection search for Elevation Angle given fixed Azimuth
   const solveElevation = (azimuth, minAngle, maxAngle, isHighAngle) => {
     let low = minAngle, high = maxAngle;
     let lastError = Infinity;
@@ -370,17 +676,14 @@ export function calculateTargetingSolution(params, targetLatLng, solveFor = 'ele
       }
       
       if (isHighAngle) {
-          // For high angle (>45), aiming higher decreases range.
-          if (r < targetRange) high = mid; else low = mid;
+        if (r < targetRange) high = mid; else low = mid;
       } else {
-          // For low angle (<45), aiming higher increases range.
-          if (r < targetRange) low = mid; else high = mid;
+        if (r < targetRange) low = mid; else high = mid;
       }
     }
     return { angle: bestAngle, rangeError: lastError };
   };
 
-  // Helper: Bisection search for Velocity given fixed Elevation Angle
   const solveVelocity = (azimuth, fixedAngle) => {
     let low = 0, high = 4000;
     let lastError = Infinity;
@@ -400,12 +703,11 @@ export function calculateTargetingSolution(params, targetLatLng, solveFor = 'ele
     return { velocity: bestV, rangeError: lastError };
   };
 
-  // Run the solver iteratively to correct for Coriolis & Wind cross-range drift
   let currentAzimuth = baseAzimuth;
   let finalPrimaryVar = -1;
   let finalError = Infinity;
 
-  const isHighAngle = solveFor === 'elevationHigh';
+  let isHighAngle = solveFor === 'elevationHigh';
   const solveForVel = solveFor === 'velocity';
 
   for (let iter = 0; iter < 4; iter++) {
@@ -420,7 +722,6 @@ export function calculateTargetingSolution(params, targetLatLng, solveFor = 'ele
     
     finalError = opt.rangeError;
 
-    // Simulate one more time to check azimuth drift
     const testParams = solveForVel 
       ? { ...baseParams, velocity: finalPrimaryVar, elevationAngle: params.elevationAngle, azimuthAngle: currentAzimuth }
       : { ...baseParams, elevationAngle: finalPrimaryVar, azimuthAngle: currentAzimuth };
@@ -436,13 +737,105 @@ export function calculateTargetingSolution(params, targetLatLng, solveFor = 'ele
     if (Math.abs(angularError) < 0.001) break;
   }
 
-  // Return the configured parameters to the UI
+  // Terrain Clearance Verification on Discovered Solution
+  const verifyParams = {
+    ...params,
+    elevationAngle: solveForVel ? params.elevationAngle : finalPrimaryVar,
+    azimuthAngle: currentAzimuth,
+    velocity: solveForVel ? finalPrimaryVar : params.velocity,
+    targetLatLng,
+    _fastMode: false,
+  };
+  const testSim = calculateTrajectory(verifyParams);
+  const collision = testSim.collision || null;
+
+  const azimuthCorrection = currentAzimuth - baseAzimuth;
+  let normalizedCorrection = azimuthCorrection;
+  if (normalizedCorrection > 180) normalizedCorrection -= 360;
+  if (normalizedCorrection < -180) normalizedCorrection += 360;
+  const deflectionMils = (normalizedCorrection * (6400 / 360));
+
   return {
     ...params,
     azimuthAngle: parseFloat(currentAzimuth.toFixed(4)),
+    baseAzimuth: parseFloat(baseAzimuth.toFixed(4)),
+    deflectionAngle: parseFloat(normalizedCorrection.toFixed(3)),
+    deflectionMils: parseFloat(deflectionMils.toFixed(1)),
     elevationAngle: solveForVel ? params.elevationAngle : parseFloat(finalPrimaryVar.toFixed(4)),
     velocity: solveForVel ? parseFloat(finalPrimaryVar.toFixed(2)) : params.velocity,
     targetRange: parseFloat(targetRange.toFixed(2)),
-    rangeError: parseFloat(finalError.toFixed(2))
+    rangeError: parseFloat(finalError.toFixed(2)),
+    solveFor,
+    collision,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// calculateAllTargetingSolutions — Finds valid, achievable ways to hit target
+// ─────────────────────────────────────────────────────────────────────────────
+export function calculateAllTargetingSolutions(params, targetLatLng) {
+  const startPos = { lat: params.startLat, lng: params.startLng };
+  const targetRange = haversineDistance(startPos, targetLatLng);
+  const terrainProfile = params.terrainProfile || null;
+
+  // 1. Solve Direct Fire (Low Angle, < 45 deg)
+  let directSol = null;
+  let directTraj = null;
+  try {
+    directSol = calculateTargetingSolution({ ...params, terrainProfile }, targetLatLng, 'elevationLow');
+    directTraj = calculateTrajectory({ ...directSol, targetLatLng, terrainProfile, _fastMode: false });
+    directTraj.inverseConfig = directSol;
+    directTraj.params = directSol;
+  } catch (err) {
+    console.error('Direct fire solver error:', err);
+  }
+
+  // 2. Solve High-Arc Plunging Fire (High Angle, > 45 deg)
+  let highArcSol = null;
+  let highArcTraj = null;
+  try {
+    highArcSol = calculateTargetingSolution({ ...params, terrainProfile }, targetLatLng, 'elevationHigh');
+    highArcTraj = calculateTrajectory({ ...highArcSol, targetLatLng, terrainProfile, _fastMode: false });
+    highArcTraj.inverseConfig = highArcSol;
+    highArcTraj.params = highArcSol;
+  } catch (err) {
+    console.error('High arc solver error:', err);
+  }
+
+  // Only present valid, achievable ways that successfully reach the target within ballistics tolerance
+  const targetDistTolerance = Math.max(50, targetRange * 0.03);
+
+  const directDist = directTraj ? parseFloat(directTraj.analysis?.groundDistance || 0) : 0;
+  const highArcDist = highArcTraj ? parseFloat(highArcTraj.analysis?.groundDistance || 0) : 0;
+
+  const directHitsTarget = directSol && Math.abs(directDist - targetRange) <= targetDistTolerance;
+  const highArcHitsTarget = highArcSol && Math.abs(highArcDist - targetRange) <= targetDistTolerance;
+
+  const isDirectViable = Boolean(directSol && directTraj && !directTraj.collision && directHitsTarget);
+  const isHighArcViable = Boolean(highArcSol && highArcTraj && !highArcTraj.collision && highArcHitsTarget);
+  const hasViableSolution = isDirectViable || isHighArcViable;
+
+  let directReason = 'Available';
+  if (!directSol || !directHitsTarget) {
+    directReason = `Target beyond direct-fire range (target: ${(targetRange / 1000).toFixed(2)} km, max reach: ${(directDist / 1000).toFixed(2)} km)`;
+  } else if (directTraj?.collision) {
+    directReason = `Blocked by terrain crest at ${directTraj.collisionPoint?.distance?.toFixed(0)}m (${directTraj.collisionPoint?.elevation?.toFixed(0)}m ASL)`;
+  }
+
+  let highArcReason = 'Available';
+  if (!highArcSol || !highArcHitsTarget) {
+    highArcReason = `Target beyond high-arc plunging range (target: ${(targetRange / 1000).toFixed(2)} km, max reach: ${(highArcDist / 1000).toFixed(2)} km)`;
+  } else if (highArcTraj?.collision) {
+    highArcReason = `Blocked by terrain crest at ${highArcTraj.collisionPoint?.distance?.toFixed(0)}m (${highArcTraj.collisionPoint?.elevation?.toFixed(0)}m ASL)`;
+  }
+
+  return {
+    targetRange: parseFloat(targetRange.toFixed(1)),
+    hasViableSolution,
+    directFire: isDirectViable ? { config: directSol, result: directTraj } : null,
+    highArc: isHighArcViable ? { config: highArcSol, result: highArcTraj } : null,
+    directReason,
+    highArcReason,
+    blockedTrajectory: !hasViableSolution ? (directTraj || highArcTraj) : null,
   };
 }

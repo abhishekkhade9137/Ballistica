@@ -1,86 +1,262 @@
 .inputBar {
   display: flex;
   flex-direction: column;
-  gap: 15px;
-  padding: 25px;
-  background-color: #ffffff;
+  gap: 20px;
+  padding: 24px;
+  background-color: var(--card-bg);
+  backdrop-filter: blur(12px);
   border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e1e5e9;
-  min-width: 320px;
-  flex: 1;
-  max-width: 400px;
+  border: 1.5px solid var(--border-color);
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.45);
+  width: 420px;
+  min-width: 380px;
+  max-width: 450px;
 }
 
-.inputBar h3 {
-  margin: 20px 0 10px 0;
-  color: #667eea;
+/* Section Header */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1.5px solid var(--border-color);
+}
+
+.sectionHeader h3 {
   font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Tactical Location Box */
+.locationBox {
+  background: #090d16;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.locRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.locLabel {
+  color: var(--text-secondary);
+  font-family: var(--font-hud);
+  font-size: 14px;
   font-weight: 600;
-  border-bottom: 2px solid #e1e5e9;
-  padding-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.inputBar h3:first-child {
-  margin-top: 0;
+.locCoords {
+  font-family: var(--font-mono);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 15px;
 }
 
+.locAlt {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-green);
+}
+
+/* Range & Bearing HUD strip */
+.rangeStrip {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1.5px solid var(--border-color);
+  padding: 14px 18px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rangeVal {
+  color: var(--accent-cyan);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+/* Weapon Selector */
 .field {
   display: flex;
   flex-direction: column;
+  gap: 8px;
 }
 
 .field label {
-  margin-bottom: 5px;
-  font-weight: 600;
-  color: #333333;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-family: var(--font-hud);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
 }
 
-.field input {
-  padding: 10px;
-  border: 2px solid #e1e5e9;
-  border-radius: 6px;
-  font-size: 14px;
-  background-color: #ffffff;
-  color: #333333;
-  transition: border-color 0.3s;
+.field select {
   width: 100%;
-  box-sizing: border-box;
-}
-
-.field input:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.field small {
-  display: block;
-  margin-top: 4px;
-  color: #666666;
-  font-size: 12px;
-  font-style: italic;
-}
-
-.calculateBtn {
-  padding: 12px 24px;
-  background-color: #667eea;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 16px;
+  height: 48px;
+  padding: 0 16px;
+  background: #090d16;
+  border: 1.5px solid var(--border-color);
+  border-radius: 8px;
+  color: #ffffff;
+  font-family: var(--font-hud);
+  font-size: 15px;
   font-weight: 600;
-  margin-top: 10px;
-  transition: background-color 0.3s, transform 0.2s;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300e5ff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px;
+  padding-right: 40px;
+  transition: all 0.2s ease;
 }
 
-.calculateBtn:hover {
-  background-color: #5a67d8;
-  transform: translateY(-2px);
+.field select:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.35);
 }
 
-.calculateBtn:active {
+.field select option {
+  background: #0f172a;
+  color: #ffffff;
+  padding: 10px;
+  font-size: 15px;
+}
+
+/* Range Status Badge */
+.rangeBadge {
+  font-family: var(--font-hud);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rangeBadge.inRange {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-green);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.rangeBadge.outOfRange {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+/* Mode Buttons Container */
+.modeContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modeOptionBtn {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border-color);
+  background: #090d16;
+  color: var(--text-secondary);
+  border-radius: 8px;
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.modeOptionBtn:hover {
+  color: #ffffff;
+  border-color: var(--accent-cyan);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.modeOptionBtn.activeDirect {
+  background: rgba(0, 229, 255, 0.15);
+  color: #ffffff;
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.3);
+}
+
+.modeOptionBtn.activeHighArc {
+  background: rgba(16, 185, 129, 0.15);
+  color: #ffffff;
+  border-color: var(--accent-green);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.3);
+}
+
+.modeSubtext {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.activeDirect .modeSubtext {
+  color: var(--accent-cyan);
+}
+
+.activeHighArc .modeSubtext {
+  color: var(--accent-green);
+}
+
+/* Solve & Simulate Button */
+.solveBtn {
+  margin-top: 6px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #00e5ff 0%, #0284c7 100%);
+  color: #080d1a;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--font-hud);
+  font-size: 15px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.35);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.solveBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 28px rgba(0, 229, 255, 0.6);
+  background: linear-gradient(135deg, #38bdf8 0%, #00e5ff 100%);
+}
+
+.solveBtn:active {
   transform: translateY(0);
 }

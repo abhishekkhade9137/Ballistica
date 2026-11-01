@@ -1,59 +1,116 @@
-/* ── App layout ─────────────────────────────────────────────────────────── */
+/* ── App Layout & Tactical C2 Header ───────────────────────────────────── */
 .app-container {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f5f6fa;
-  color: #333333;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.04) 0%, transparent 60%),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 48px 48px, 48px 48px;
 }
 
-/* ── Header ─────────────────────────────────────────────────────────────── */
+/* ── Military C2 Header ─────────────────────────────────────────────────── */
 .header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 24px 20px;
-  text-align: center;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  background: #0f172a;
+  border-bottom: 1px solid var(--border-color);
+  padding: 18px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  position: relative;
+  z-index: 20;
 }
 
-.header h1 {
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-title h1 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 2px;
   margin: 0;
-  font-size: 2.2rem;
-  font-weight: 600;
-  color: white;
-  letter-spacing: -0.5px;
 }
 
-.header p {
-  margin: 8px 0 0 0;
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.demo-trigger-btn {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1.5px solid #10b981;
+  font-family: var(--font-hud);
+  font-weight: 700;
   font-size: 14px;
-  opacity: 0.9;
-  font-weight: 400;
+  padding: 10px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.25);
+  transition: all 0.2s ease;
+  letter-spacing: 0.8px;
 }
 
-/* ── Main content (sidebar + map side-by-side) ──────────────────────────── */
+.demo-trigger-btn:hover {
+  background: #10b981;
+  color: #0b0f19;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+}
+
+/* ── Main Content Layout ─────────────────────────────────────────────────── */
 .main-content {
   flex: 1;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  padding: 24px;
-  gap: 20px;
-  max-width: 1500px;
+  align-items: stretch;
+  padding: 24px 32px;
+  gap: 24px;
+  max-width: 1750px;
   margin: 0 auto;
   width: 100%;
-  box-sizing: border-box;
+}
+
+.analysis-wrapper {
+  padding: 0 32px 32px 32px;
+  max-width: 1750px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .main-content {
     flex-direction: column;
     align-items: stretch;
   }
-
-  .header h1 {
-    font-size: 1.6rem;
+  
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 }
