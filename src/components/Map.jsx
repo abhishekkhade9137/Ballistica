@@ -254,6 +254,12 @@ function Map({
     layersRef.current.forEach(layer => map.removeLayer(layer));
     layersRef.current = [];
 
+    // If gun or target is not placed, wipe all trajectory polylines and exit
+    if (!startingPoint || !targetPoint || !startingPoint.lat || !targetPoint.lat) {
+      boundsPointsRef.current = [];
+      return;
+    }
+
     const boundsPoints = [];
 
     // Helper to render a trajectory polyline on the tactical map
@@ -470,7 +476,42 @@ function Map({
 
       lineOfSightRef.current = line;
     }
+
+    return () => {
+      if (lineOfSightRef.current && map) {
+        map.removeLayer(lineOfSightRef.current);
+        lineOfSightRef.current = null;
+      }
+    };
   }, [startingPoint, targetPoint]);
+
+  // Completely wipe markers, lines of fire, trajectories, and range rings from map
+  const handleClear = () => {
+    const map = mapRef.current;
+    if (map) {
+      if (lineOfSightRef.current) {
+        map.removeLayer(lineOfSightRef.current);
+        lineOfSightRef.current = null;
+      }
+      if (startMarkerRef.current) {
+        map.removeLayer(startMarkerRef.current);
+        startMarkerRef.current = null;
+      }
+      if (targetMarkerRef.current) {
+        map.removeLayer(targetMarkerRef.current);
+        targetMarkerRef.current = null;
+      }
+      rangeRingsRef.current.forEach((ring) => map.removeLayer(ring));
+      rangeRingsRef.current = [];
+      layersRef.current.forEach((layer) => map.removeLayer(layer));
+      layersRef.current = [];
+      boundsPointsRef.current = [];
+      lastCoordsKeyRef.current = '';
+    }
+    if (onClearMarkings) {
+      onClearMarkings();
+    }
+  };
 
   return (
     <div className={styles.mapWrapper}>
@@ -493,10 +534,10 @@ function Map({
           </button>
           <button
             type="button"
-            onClick={onClearMarkings}
+            onClick={handleClear}
             disabled={!startingPoint?.lat && !targetPoint?.lat}
             className={`${styles.placementBtn} ${styles.clearBtn}`}
-            title="Clear both Gun and Target markings from map"
+            title="Clear both Gun and Target markings and all connecting lines from map"
           >
             Clear Markings
           </button>
