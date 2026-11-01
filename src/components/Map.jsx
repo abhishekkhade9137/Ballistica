@@ -72,6 +72,7 @@ function Map({
   onSelectSolution,
   onSetStartingPoint,
   onSetTargetPoint,
+  onClearMarkings,
   startingPoint,
   targetPoint,
   placementMode,
@@ -377,7 +378,7 @@ function Map({
       startMarkerRef.current = null;
     }
 
-    if (startingPoint && (startingPoint.lat !== 0 || startingPoint.lng !== 0)) {
+    if (startingPoint && startingPoint.lat != null && startingPoint.lng != null && (startingPoint.lat !== 0 || startingPoint.lng !== 0)) {
       const marker = L.marker([startingPoint.lat, startingPoint.lng], {
         icon: createTacticalBatteryIcon(),
         draggable: true,
@@ -399,6 +400,9 @@ function Map({
 
       startMarkerRef.current = marker;
       updateRangeRings(startingPoint.lat, startingPoint.lng);
+    } else {
+      rangeRingsRef.current.forEach(layer => map.removeLayer(layer));
+      rangeRingsRef.current = [];
     }
   }, [startingPoint]);
 
@@ -412,7 +416,7 @@ function Map({
       targetMarkerRef.current = null;
     }
 
-    if (targetPoint && (targetPoint.lat !== 0 || targetPoint.lng !== 0)) {
+    if (targetPoint && targetPoint.lat != null && targetPoint.lng != null && (targetPoint.lat !== 0 || targetPoint.lng !== 0)) {
       const marker = L.marker([targetPoint.lat, targetPoint.lng], {
         icon: createTacticalTargetIcon(),
         draggable: true,
@@ -486,6 +490,15 @@ function Map({
             className={`${styles.placementBtn} ${activeMode === 'target' ? styles.activeTarget : ''}`}
           >
             2. Set Target
+          </button>
+          <button
+            type="button"
+            onClick={onClearMarkings}
+            disabled={!startingPoint?.lat && !targetPoint?.lat}
+            className={`${styles.placementBtn} ${styles.clearBtn}`}
+            title="Clear both Gun and Target markings from map"
+          >
+            Clear Markings
           </button>
         </div>
 

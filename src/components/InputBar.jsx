@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 function InputBar({
   onCalculate,
   onFindSolutions,
+  onClearMarkings,
   startingPoint,
   targetPoint,
   availableSolutions,
@@ -99,8 +100,8 @@ function InputBar({
 
   // Auto-fetch Battery Altitude whenever Battery coordinates change
   useEffect(() => {
-    if (startLat !== undefined && startLng !== undefined) {
-      let isMounted = true;
+    let isMounted = true;
+    if (startLat != null && startLng != null) {
       queueMicrotask(() => {
         if (isMounted) setFetchingStartAlt(true);
       });
@@ -111,14 +112,21 @@ function InputBar({
           logger.info('GIS', `Battery ground elevation resolved: ${alt.toFixed(0)}m ASL`);
         }
       });
-      return () => { isMounted = false; };
+    } else {
+      queueMicrotask(() => {
+        if (isMounted) {
+          setStartAlt(null);
+          setFetchingStartAlt(false);
+        }
+      });
     }
+    return () => { isMounted = false; };
   }, [startLat, startLng]);
 
   // Auto-fetch Target Altitude whenever Target coordinates change
   useEffect(() => {
-    if (targetLat !== undefined && targetLng !== undefined) {
-      let isMounted = true;
+    let isMounted = true;
+    if (targetLat != null && targetLng != null) {
       queueMicrotask(() => {
         if (isMounted) setFetchingTargetAlt(true);
       });
@@ -129,14 +137,21 @@ function InputBar({
           logger.info('GIS', `Target ground elevation resolved: ${alt.toFixed(0)}m ASL`);
         }
       });
-      return () => { isMounted = false; };
+    } else {
+      queueMicrotask(() => {
+        if (isMounted) {
+          setTargetAlt(null);
+          setFetchingTargetAlt(false);
+        }
+      });
     }
+    return () => { isMounted = false; };
   }, [targetLat, targetLng]);
 
   // Auto-fetch continuous path elevation profile between Battery and Target
   useEffect(() => {
-    if (startLat !== undefined && startLng !== undefined && targetLat !== undefined && targetLng !== undefined) {
-      let isMounted = true;
+    let isMounted = true;
+    if (startLat != null && startLng != null && targetLat != null && targetLng != null) {
       fetchTerrainPath({ lat: startLat, lng: startLng }, { lat: targetLat, lng: targetLng }).then((profile) => {
         if (isMounted && profile && profile.length > 0) {
           setPathTerrain(profile);
@@ -144,8 +159,14 @@ function InputBar({
           logger.info('GIS', `Flight path terrain profile sampled (${profile.length} waypoints, peak: ${maxRidge}m ASL)`);
         }
       });
-      return () => { isMounted = false; };
+    } else {
+      queueMicrotask(() => {
+        if (isMounted) {
+          setPathTerrain(null);
+        }
+      });
     }
+    return () => { isMounted = false; };
   }, [startLat, startLng, targetLat, targetLng]);
 
   // Compute Range and Bearing between Battery and Target
@@ -211,7 +232,7 @@ function InputBar({
 
   // Auto-solve firing solutions when locations, weapon, altitude, or path terrain changes
   useEffect(() => {
-    if (startLat !== undefined && targetLat !== undefined && !fetchingStartAlt && !fetchingTargetAlt) {
+    if (startLat != null && targetLat != null && !fetchingStartAlt && !fetchingTargetAlt) {
       const timer = setTimeout(() => {
         handleFireSimulation();
       }, 150);
@@ -224,6 +245,16 @@ function InputBar({
       {/* 1. Target Tracking Summary */}
       <div className={styles.sectionHeader}>
         <h3>Targeting & Positions</h3>
+        {(startingPoint?.lat || targetPoint?.lat) && (
+          <button
+            type="button"
+            onClick={onClearMarkings}
+            className={styles.clearPositionsBtn}
+            title="Clear Gun and Target markings from map"
+          >
+            Clear Markings
+          </button>
+        )}
       </div>
 
       <div className={styles.locationBox}>
@@ -236,7 +267,7 @@ function InputBar({
         <div className={styles.locRow}>
           <span className={styles.locLabel} style={{ color: 'var(--text-muted)' }}>Elevation:</span>
           <span className={styles.locAlt}>
-            {fetchingStartAlt ? 'Querying...' : `${startAlt.toFixed(0)}m ASL`}
+            {fetchingStartAlt ? 'Querying...' : (startAlt != null ? `${startAlt.toFixed(0)}m ASL` : '--')}
           </span>
         </div>
 
@@ -251,7 +282,7 @@ function InputBar({
         <div className={styles.locRow}>
           <span className={styles.locLabel} style={{ color: 'var(--text-muted)' }}>Elevation:</span>
           <span className={styles.locAlt}>
-            {fetchingTargetAlt ? 'Querying...' : `${targetAlt.toFixed(0)}m ASL`}
+            {fetchingTargetAlt ? 'Querying...' : (targetAlt != null ? `${targetAlt.toFixed(0)}m ASL` : '--')}
           </span>
         </div>
       </div>
@@ -261,14 +292,18 @@ function InputBar({
         <div>
           <span style={{ fontSize: '13px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>Range</span>
           <div className={styles.rangeVal}>
-            {targetDistanceM >= 1000
-              ? `${(targetDistanceM / 1000).toFixed(2)} km`
-              : `${targetDistanceM.toFixed(0)} m`}
+            {startingPoint?.lat && targetPoint?.lat
+              ? (targetDistanceM >= 1000
+                ? `${(targetDistanceM / 1000).toFixed(2)} km`
+                : `${targetDistanceM.toFixed(0)} m`)
+              : '--'}
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <span style={{ fontSize: '13px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>Azimuth</span>
-          <div className={styles.rangeVal}>{targetBearing.toFixed(1)}°</div>
+          <div className={styles.rangeVal}>
+            {startingPoint?.lat && targetPoint?.lat ? `${targetBearing.toFixed(1)}°` : '--'}
+          </div>
         </div>
       </div>
 

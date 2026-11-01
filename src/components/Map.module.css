@@ -103,6 +103,25 @@
   box-shadow: 0 0 14px rgba(239, 68, 68, 0.35);
 }
 
+.placementBtn.clearBtn {
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  margin-left: 2px;
+}
+
+.placementBtn.clearBtn:hover:not(:disabled) {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.6);
+  background: rgba(239, 68, 68, 0.12);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
+}
+
+.placementBtn.clearBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: transparent;
+}
+
 /* Layer Control Switcher (Pinned to Top Right) */
 .layerControl {
   display: flex;

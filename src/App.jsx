@@ -37,6 +37,15 @@ function App() {
     }
   }, []);
 
+  const handleClearMarkings = useCallback(() => {
+    setStartingPoint(null);
+    setTargetPoint(null);
+    setTrajectoryData(null);
+    setAvailableSolutions(null);
+    setPlacementMode('battery');
+    logger.tactical('GIS', 'Cleared Gun Battery and Target Objective markings from map');
+  }, []);
+
   // Solve all ways to hit target
   const handleFindSolutions = useCallback((params) => {
     try {
@@ -168,6 +177,7 @@ function App() {
         <InputBar
           onCalculate={handleCalculate}
           onFindSolutions={handleFindSolutions}
+          onClearMarkings={handleClearMarkings}
           startingPoint={startingPoint}
           targetPoint={targetPoint}
           placementMode={placementMode}
@@ -183,6 +193,7 @@ function App() {
           onSelectSolution={handleSelectSolution}
           onSetStartingPoint={handleSetStartingPoint}
           onSetTargetPoint={handleSetTargetPoint}
+          onClearMarkings={handleClearMarkings}
           startingPoint={startingPoint}
           targetPoint={targetPoint}
           placementMode={placementMode}
