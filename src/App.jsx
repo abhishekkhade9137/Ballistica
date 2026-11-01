@@ -5,6 +5,7 @@ import Map from './components/Map';
 import InputBar from './components/InputBar';
 import TrajectoryAnalysis from './components/TrajectoryAnalysis';
 import DiagnosticsModal from './components/DiagnosticsModal';
+import HistoricalScenariosModal from './components/HistoricalScenariosModal';
 import { calculateTrajectory, calculateAllTargetingSolutions } from './utils/calculator';
 import { logger } from './utils/logger';
 
@@ -13,6 +14,8 @@ function App() {
   const [availableSolutions, setAvailableSolutions] = useState(null);
   const [activeSolutionType, setActiveSolutionType] = useState('directFire'); // 'directFire' | 'highArc'
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [scenariosOpen, setScenariosOpen] = useState(false);
+  const [activeScenario, setActiveScenario] = useState(null);
 
   // Default Initial Tactical Coordinates (Mountain Topography Sector)
   const [startingPoint, setStartingPoint] = useState({ lat: 34.4280, lng: 75.7600 }); 
@@ -38,12 +41,27 @@ function App() {
   }, []);
 
   const handleClearMarkings = useCallback(() => {
+    setActiveScenario(null);
     setStartingPoint(null);
     setTargetPoint(null);
     setTrajectoryData(null);
     setAvailableSolutions(null);
     setPlacementMode('battery');
     logger.tactical('GIS', 'Cleared Gun Battery and Target Objective markings from map');
+  }, []);
+
+  const handleSelectScenario = useCallback((scenario) => {
+    if (!scenario) return;
+    setActiveScenario(scenario);
+    setStartingPoint(scenario.batteryCoords);
+    setTargetPoint(scenario.targetCoords);
+    if (scenario.preferredMode) {
+      setActiveSolutionType(scenario.preferredMode);
+    }
+    logger.tactical(
+      'SCENARIO',
+      `Loaded historical scenario: ${scenario.title} (${scenario.conflict}) — ${scenario.theater}`
+    );
   }, []);
 
   // Solve all ways to hit target
@@ -147,6 +165,33 @@ function App() {
             type="button"
             className="demo-trigger-btn"
             style={{
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.3) 100%)',
+              border: '1px solid #f59e0b',
+              color: '#f59e0b',
+              boxShadow: '0 0 12px rgba(245, 158, 11, 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+            onClick={() => setScenariosOpen(true)}
+          >
+            <span>Historical Presets</span>
+            <span style={{
+              fontSize: '10px',
+              fontFamily: 'var(--font-mono)',
+              background: 'rgba(245, 158, 11, 0.3)',
+              color: '#ffffff',
+              padding: '2px 6px',
+              borderRadius: '4px',
+            }}>
+              5 BATTLES
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className="demo-trigger-btn"
+            style={{
               background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.3) 100%)',
               border: '1px solid #10b981',
               color: '#10b981',
@@ -178,6 +223,9 @@ function App() {
           onCalculate={handleCalculate}
           onFindSolutions={handleFindSolutions}
           onClearMarkings={handleClearMarkings}
+          activeScenario={activeScenario}
+          onSelectScenario={handleSelectScenario}
+          onOpenScenariosModal={() => setScenariosOpen(true)}
           startingPoint={startingPoint}
           targetPoint={targetPoint}
           placementMode={placementMode}
@@ -218,6 +266,13 @@ function App() {
       <DiagnosticsModal
         isOpen={diagnosticsOpen}
         onClose={() => setDiagnosticsOpen(false)}
+      />
+
+      {/* Historical Artillery Engagements Modal */}
+      <HistoricalScenariosModal
+        isOpen={scenariosOpen}
+        onClose={() => setScenariosOpen(false)}
+        onSelectScenario={handleSelectScenario}
       />
     </div>
   );

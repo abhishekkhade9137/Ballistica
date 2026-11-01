@@ -2,11 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import styles from './InputBar.module.css';
 import { fetchElevation, fetchTerrainPath, haversineDistance, calculateBearing } from '../utils/calculator';
 import { logger } from '../utils/logger';
+import { HISTORICAL_PRESETS } from '../data/historicalPresets';
 
 function InputBar({
   onCalculate,
   onFindSolutions,
   onClearMarkings,
+  activeScenario,
+  onSelectScenario,
+  onOpenScenariosModal,
   startingPoint,
   targetPoint,
   availableSolutions,
@@ -240,8 +244,72 @@ function InputBar({
     }
   }, [startLat, targetLat, fetchingStartAlt, fetchingTargetAlt, handleFireSimulation]);
 
+  // Synchronize environmental and weapon settings when a historical scenario is loaded
+  useEffect(() => {
+    if (activeScenario) {
+      let isMounted = true;
+      queueMicrotask(() => {
+        if (!isMounted) return;
+        if (activeScenario.gunKey) setSelectedGun(activeScenario.gunKey);
+        if (activeScenario.weather) {
+          setWindSpeed(activeScenario.weather.windSpeed);
+          setWindDirection(activeScenario.weather.windDirection);
+          setGroundTempC(activeScenario.weather.groundTempC);
+          setGroundPressureHpa(activeScenario.weather.groundPressureHpa);
+        }
+        if (activeScenario.startElevation != null) {
+          setStartAlt(activeScenario.startElevation);
+        }
+        if (activeScenario.targetElevation != null) {
+          setTargetAlt(activeScenario.targetElevation);
+        }
+      });
+      return () => { isMounted = false; };
+    }
+  }, [activeScenario]);
+
   return (
     <div className={styles.inputBar}>
+      {/* Historical Engagements Quick-Select Ribbon */}
+      <div className={styles.scenarioBar}>
+        <div className={styles.scenarioBarHeader}>
+          <span className={styles.scenarioBarTitle}>Historical Preset</span>
+          <button
+            type="button"
+            className={styles.scenarioDossierBtn}
+            onClick={onOpenScenariosModal}
+            title="Open Historical Battle Dossier"
+          >
+            Battle Dossiers &raquo;
+          </button>
+        </div>
+        <select
+          className={styles.scenarioSelect}
+          value={activeScenario?.id || ''}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (!val) {
+              if (onSelectScenario) onSelectScenario(null);
+            } else {
+              const matched = HISTORICAL_PRESETS.find((p) => p.id === val);
+              if (matched && onSelectScenario) onSelectScenario(matched);
+            }
+          }}
+        >
+          <option value="">-- Custom Coordinates (Free Grid) --</option>
+          {HISTORICAL_PRESETS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.title} ({p.conflict})
+            </option>
+          ))}
+        </select>
+        {activeScenario && (
+          <div className={styles.activeScenarioNote}>
+            <strong>{activeScenario.conflict}:</strong> {activeScenario.subtitle}
+          </div>
+        )}
+      </div>
+
       {/* 1. Target Tracking Summary */}
       <div className={styles.sectionHeader}>
         <h3>Targeting & Positions</h3>
